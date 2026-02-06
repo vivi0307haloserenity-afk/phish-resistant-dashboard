@@ -1,0 +1,1672 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        @Model.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- TOP SECTION: Tenant Summary / Authority -->
+<div class="card section-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-building me-2"></i>Verified ID Tenant Summary</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-light" onclick="showCreateAuthorityModal()" title="Create New Authority">
+                <i class="bi bi-plus-circle me-1"></i> New Authority
+            </button>
+            @if (Model.Authorities.Count > 1)
+            {
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        @Model.SelectedAuthority?.Name
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        @foreach (var auth in Model.Authorities)
+                        {
+                            <li>
+                                <a class="dropdown-item @(auth.Id == Model.SelectedAuthority?.Id ? "active" : "")" 
+                                   href="@Url.Action("Index", "Home", new { authorityId = auth.Id })">
+                                    @auth.Name
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="card-body">
+        @if (Model.SelectedAuthority != null)
+        {
+            <!-- Authority Actions Bar -->
+            <div class="d-flex justify-content-end mb-3 gap-2">
+                <button class="btn btn-outline-info btn-sm" onclick="listAuthorities()" title="List All Authorities">
+                    <i class="bi bi-list-ul me-1"></i> List All
+                </button>
+                <button class="btn btn-outline-primary btn-sm" onclick="showUpdateAuthorityModal('@Model.SelectedAuthority.Id', '@Model.SelectedAuthority.Name')" title="Update Authority">
+                    <i class="bi bi-pencil me-1"></i> Update
+                </button>
+                <button class="btn btn-outline-danger btn-sm" onclick="deleteAuthority('@Model.SelectedAuthority.Id', '@Model.SelectedAuthority.Name')" title="Delete Authority">
+                    <i class="bi bi-trash me-1"></i> Delete
+                </button>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="info-label">Authority Name</div>
+                        <div class="info-value">@Model.SelectedAuthority.Name</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Authority ID</div>
+                        <div class="info-value text-muted" style="font-size: 0.9rem;">@Model.SelectedAuthority.Id</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="info-label">Status</div>
+                        <span class="status-badge status-enabled">@Model.SelectedAuthority.Status</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    @if (Model.SelectedAuthority.DidModel != null)
+                    {
+                        <div class="mb-3">
+                            <div class="info-label">DID</div>
+                            <div class="info-value" style="font-size: 0.85rem;">@Model.SelectedAuthority.DidModel.Did</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="info-label">DID Document Status</div>
+                            <span class="status-badge status-published">@Model.SelectedAuthority.DidModel.DidDocumentStatus</span>
+                        </div>
+                        <div class="mb-3">
+                            <div class="info-label">Linked Domains</div>
+                            @foreach (var domain in Model.SelectedAuthority.DidModel.LinkedDomainUrls)
+                            {
+                                <div><a href="@domain" target="_blank">@domain <i class="bi bi-box-arrow-up-right"></i></a></div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            @if (Model.SelectedAuthority.KeyVaultMetadata != null)
+            {
+                <hr />
+                <h6 class="mb-3"><i class="bi bi-key me-2"></i>Key Vault Information</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="info-label">Key Vault Name</div>
+                        <div class="info-value">@Model.SelectedAuthority.KeyVaultMetadata.ResourceName</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="info-label">Resource Group</div>
+                        <div class="info-value">@Model.SelectedAuthority.KeyVaultMetadata.ResourceGroup</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="info-label">Subscription ID</div>
+                        <div class="info-value" style="font-size: 0.85rem;">@Model.SelectedAuthority.KeyVaultMetadata.SubscriptionId</div>
+                    </div>
+                </div>
+                
+                <!-- FaceCheck Add-on Section -->
+                <hr />
+                <h6 class="mb-3"><i class="bi bi-person-bounding-box me-2"></i>Face Check Add-on</h6>
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <div class="info-label">Face Check Status</div>
+                        <div id="faceCheckStatus" class="d-flex align-items-center gap-2">
+                            <span class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </span>
+                            <span class="text-muted">Checking status...</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="info-label">Location</div>
+                        <select id="faceCheckLocation" class="form-select form-select-sm" style="max-width: 200px;">
+                            <option value="westus2">West US 2 (Non-EU)</option>
+                            <option value="northeurope">North Europe (EU)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button id="faceCheckToggleBtn" class="btn btn-outline-primary btn-sm" 
+                                onclick="toggleFaceCheck('@Model.SelectedAuthority.Id', '@Model.SelectedAuthority.KeyVaultMetadata.SubscriptionId', '@Model.SelectedAuthority.KeyVaultMetadata.ResourceGroup')"
+                                disabled>
+                            <i class="bi bi-toggle-on me-1"></i> <span id="faceCheckBtnText">Loading...</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Face Check is a premium feature that enables privacy-respecting facial matching for high-assurance verifications.
+                        <a href="https://learn.microsoft.com/en-us/entra/verified-id/using-facecheck" target="_blank">Learn more</a>
+                    </small>
+                </div>
+            }
+            
+            <hr />
+            <h6 class="mb-3"><i class="bi bi-gear me-2"></i>Other Admin Actions for Authority</h6>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline-primary btn-sm" onclick="generateDidDocument('@Model.SelectedAuthority.Id')">
+                    <i class="bi bi-file-earmark-code me-1"></i> Generate DID Document
+                </button>
+                <button class="btn btn-outline-primary btn-sm" onclick="showWellKnownModal('@Model.SelectedAuthority.Id')">
+                    <i class="bi bi-file-earmark-text me-1"></i> Generate Well-Known Config
+                </button>
+                <button class="btn btn-outline-primary btn-sm" onclick="validateWellKnown('@Model.SelectedAuthority.Id')">
+                    <i class="bi bi-check-circle me-1"></i> Validate Well-Known Config
+                </button>
+                <button class="btn btn-outline-warning btn-sm" onclick="rotateSigningKey('@Model.SelectedAuthority.Id')">
+                    <i class="bi bi-arrow-repeat me-1"></i> Rotate Signing Key
+                </button>
+                <button class="btn btn-outline-success btn-sm" onclick="synchronizeWithDid('@Model.SelectedAuthority.Id')">
+                    <i class="bi bi-cloud-upload me-1"></i> Sync with DID Document
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-4">
+                <i class="bi bi-info-circle display-4 text-muted"></i>
+                <p class="mt-3 text-muted">No authorities found. Please set up Verified ID in your tenant first.</p>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- MIDDLE SECTION: Contracts -->
+<div class="card section-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-file-earmark-ruled me-2"></i>Contracts
+        </div>
+        @if (Model.SelectedAuthority != null)
+        {
+            <button class="btn btn-sm btn-light" onclick="showCreateContractModal()" title="Create New Contract">
+                <i class="bi bi-plus-circle me-1"></i> New Contract
+            </button>
+        }
+    </div>
+    <div class="card-body">
+        @if (Model.Contracts.Count > 0)
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>VC Directory</th>
+                            <th>Manifest URL</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var contract in Model.Contracts)
+                        {
+                            <tr>
+                                <td class="fw-bold">@contract.Name</td>
+                                <td><span class="status-badge status-enabled">@contract.Status</span></td>
+                                <td>
+                                    @if (contract.AvailableInVcDirectory)
+                                    {
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-x-circle text-muted"></i>
+                                    }
+                                </td>
+                                <td>
+                                    <a href="@contract.ManifestUrl" target="_blank" class="text-truncate d-inline-block" style="max-width: 200px;">
+                                        @contract.ManifestUrl
+                                    </a>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary action-btn" onclick="viewContract('@Model.SelectedAuthority?.Id', '@contract.Id')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary action-btn" onclick="editContract('@Model.SelectedAuthority?.Id', '@contract.Id')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-4">
+                <i class="bi bi-folder2-open display-4 text-muted"></i>
+                <p class="mt-3 text-muted">No contracts found for this authority.</p>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- BOTTOM SECTION: Credentials -->
+<div class="card section-card">
+    <div class="card-header">
+        <i class="bi bi-person-badge me-2"></i>Credential Operations
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs mb-3" id="credentialTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="get-tab" data-bs-toggle="tab" data-bs-target="#get-panel" type="button">
+                    <i class="bi bi-search me-1"></i> Get Credential
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search-panel" type="button">
+                    <i class="bi bi-funnel me-1"></i> Search Credentials
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="revoke-tab" data-bs-toggle="tab" data-bs-target="#revoke-panel" type="button">
+                    <i class="bi bi-x-octagon me-1"></i> Revoke Credential
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="credentialTabsContent">
+            <!-- Get Credential Tab -->
+            <div class="tab-pane fade show active" id="get-panel" role="tabpanel">
+                <form id="getCredentialForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Contract</label>
+                        <select class="form-select" id="getContractId" required>
+                            <option value="">Select a contract...</option>
+                            @foreach (var contract in Model.Contracts)
+                            {
+                                <option value="@contract.Id">@contract.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Credential ID</label>
+                        <input type="text" class="form-control" id="getCredentialId" placeholder="urn:pic:..." required />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                            Get
+                        </button>
+                    </div>
+                </form>
+                <div id="getCredentialResult" class="mt-3"></div>
+            </div>
+            
+            <!-- Search Credentials Tab -->
+            <div class="tab-pane fade" id="search-panel" role="tabpanel">
+                <form id="searchCredentialsForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Contract</label>
+                        <select class="form-select" id="searchContractId" required>
+                            <option value="">Select a contract...</option>
+                            @foreach (var contract in Model.Contracts)
+                            {
+                                <option value="@contract.Id">@contract.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Indexed Claim Value</label>
+                        <input type="text" class="form-control" id="searchClaimValue" placeholder="Enter the claim value to search..." required />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                            Search
+                        </button>
+                    </div>
+                </form>
+                <div id="searchCredentialsResult" class="mt-3"></div>
+            </div>
+            
+            <!-- Revoke Credential Tab -->
+            <div class="tab-pane fade" id="revoke-panel" role="tabpanel">
+                <form id="revokeCredentialForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Contract</label>
+                        <select class="form-select" id="revokeContractId" required>
+                            <option value="">Select a contract...</option>
+                            @foreach (var contract in Model.Contracts)
+                            {
+                                <option value="@contract.Id">@contract.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Credential ID</label>
+                        <input type="text" class="form-control" id="revokeCredentialId" placeholder="urn:pic:..." required />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-danger w-100">
+                            <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                            Revoke
+                        </button>
+                    </div>
+                </form>
+                <div id="revokeCredentialResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Authority Modal -->
+<div class="modal fade" id="createAuthorityModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Create New Authority</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createAuthorityForm">
+                    <div class="mb-3">
+                        <label class="form-label">Authority Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="createAuthorityName" placeholder="e.g., Contoso Verified ID" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Linked Domain URL <span class="text-danger">*</span></label>
+                        <input type="url" class="form-control" id="createAuthorityDomainUrl" placeholder="https://verifiedid.contoso.com/" required />
+                        <div class="form-text">The domain that will be linked to this DID.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">DID Method</label>
+                        <select class="form-select" id="createAuthorityDidMethod">
+                            <option value="web" selected>did:web</option>
+                        </select>
+                    </div>
+                    <hr />
+                    <h6 class="mb-3"><i class="bi bi-key me-2"></i>Key Vault Configuration</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Subscription ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createAuthoritySubscriptionId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Resource Group <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createAuthorityResourceGroup" placeholder="e.g., rg-verifiedid" required />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Key Vault Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createAuthorityKeyVaultName" placeholder="e.g., kv-verifiedid" required />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Key Vault URL <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="createAuthorityKeyVaultUrl" placeholder="https://kv-verifiedid.vault.azure.net/" required />
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createAuthorityBtn" onclick="createAuthority()">
+                    <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                    <i class="bi bi-plus-circle me-1"></i> Create Authority
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Authority Modal -->
+<div class="modal fade" id="updateAuthorityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Update Authority</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateAuthorityForm">
+                    <input type="hidden" id="updateAuthorityId" />
+                    <div class="mb-3">
+                        <label class="form-label">Authority Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="updateAuthorityName" placeholder="Enter new name" required />
+                        <div class="form-text">Update the display name of this authority.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="updateAuthorityBtn" onclick="updateAuthority()">
+                    <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                    <i class="bi bi-save me-1"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- List Authorities Modal -->
+<div class="modal fade" id="listAuthoritiesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-list-ul me-2"></i>All Authorities</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="listAuthoritiesModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Well-Known Config Modal -->
+<div class="modal fade" id="wellKnownModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-text me-2"></i>Generate Well-Known DID Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="wellKnownForm">
+                    <input type="hidden" id="wellKnownAuthorityId" />
+                    <div class="mb-3">
+                        <label class="form-label">Domain URL</label>
+                        <input type="url" class="form-control" id="wellKnownDomainUrl" placeholder="https://example.com/" required />
+                        <div class="form-text">Enter the domain URL that is linked to this DID.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="generateWellKnown()">
+                    <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                    Generate
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contract Details Modal -->
+<div class="modal fade" id="contractModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-ruled me-2"></i>Contract Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contractModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Contract Modal -->
+<div class="modal fade" id="editContractModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Contract</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editContractModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveContractBtn" onclick="saveContract()">
+                    <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                    <i class="bi bi-save me-1"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Contract Modal -->
+<div class="modal fade" id="createContractModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Create New Contract</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createContractForm">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Contract Name</strong> <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="createContractName" placeholder="e.g., VerifiedEmployee" required />
+                                <div class="form-text">A unique name for this credential contract.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Authority</strong></label>
+                                <input type="text" class="form-control" id="createContractAuthority" value="@Model.SelectedAuthority?.Name" disabled />
+                                <input type="hidden" id="createContractAuthorityId" value="@Model.SelectedAuthority?.Id" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr />
+                    
+                    <h6 class="mb-3"><i class="bi bi-card-checklist me-2"></i>Display Configuration</h6>
+                    <p class="text-muted small">Configure how the credential appears in the wallet.</p>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Credential Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createContractTitle" placeholder="e.g., Verified Employee" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Issued By <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createContractIssuedBy" placeholder="e.g., Contoso" required />
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Background Color</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" id="createContractBgColor" value="#2E7D32" />
+                                <input type="text" class="form-control" id="createContractBgColorText" value="#2E7D32" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Text Color</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" id="createContractTextColor" value="#FFFFFF" />
+                                <input type="text" class="form-control" id="createContractTextColorText" value="#FFFFFF" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="createContractDescription" rows="2" placeholder="A brief description of this credential"></textarea>
+                    </div>
+                    
+                    <hr />
+                    
+                    <h6 class="mb-3"><i class="bi bi-gear me-2"></i>Rules Configuration</h6>
+                    <p class="text-muted small">Configure attestation rules and validity settings.</p>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Validity Interval (seconds)</label>
+                            <input type="number" class="form-control" id="createContractValidity" value="2592000" min="1" />
+                            <div class="form-text">Default: 2592000 (30 days)</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Credential Type <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createContractVcType" placeholder="e.g., VerifiedEmployee" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Attestation Type</label>
+                            <select class="form-select" id="createContractAttestationType">
+                                <option value="idTokenHint" selected>ID Token Hint</option>
+                                <option value="selfIssued">Self Issued</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Claims Mapping</strong></label>
+                        <div class="text-muted small mb-2">Define the claims to include in the credential. Add input/output claim pairs.</div>
+                        
+                        <div id="claimsMappingList">
+                            <div class="row mb-2 claim-row" id="claimRow-0">
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control claim-input" placeholder="Input Claim (e.g., given_name)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control claim-output" placeholder="Output Claim (e.g., firstName)" />
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input claim-required" type="checkbox" checked />
+                                        <label class="form-check-label">Required</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger" onclick="removeClaimRow(0)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addClaimRow()">
+                            <i class="bi bi-plus-lg me-1"></i>Add Claim
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createContractBtn" onclick="createContract()">
+                    <span class="loading-spinner spinner-border spinner-border-sm me-1"></span>
+                    <i class="bi bi-plus-circle me-1"></i> Create Contract
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resultModalTitle">Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="resultModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="resultCopyBtn" onclick="copyResultToClipboard()">
+                    <i class="bi bi-clipboard me-1"></i> Copy
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const authorityId = '@Model.SelectedAuthority?.Id';
+    
+    // Authority CRUD Actions
+    function showCreateAuthorityModal() {
+        document.getElementById('createAuthorityForm').reset();
+        new bootstrap.Modal(document.getElementById('createAuthorityModal')).show();
+    }
+    
+    async function createAuthority() {
+        const btn = document.getElementById('createAuthorityBtn');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        const request = {
+            name: document.getElementById('createAuthorityName').value,
+            linkedDomainUrl: document.getElementById('createAuthorityDomainUrl').value,
+            didMethod: document.getElementById('createAuthorityDidMethod').value,
+            keyVaultMetadata: {
+                subscriptionId: document.getElementById('createAuthoritySubscriptionId').value,
+                resourceGroup: document.getElementById('createAuthorityResourceGroup').value,
+                resourceName: document.getElementById('createAuthorityKeyVaultName').value,
+                resourceUrl: document.getElementById('createAuthorityKeyVaultUrl').value
+            }
+        };
+        
+        try {
+            const response = await fetch('/api/authority', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(request)
+            });
+            
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('createAuthorityModal')).hide();
+                showSuccess('Authority created successfully!');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                const data = await response.json();
+                showError('Failed to create authority: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            showError('Failed to create authority: ' + error.message);
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    function showUpdateAuthorityModal(authId, currentName) {
+        document.getElementById('updateAuthorityId').value = authId;
+        document.getElementById('updateAuthorityName').value = currentName;
+        new bootstrap.Modal(document.getElementById('updateAuthorityModal')).show();
+    }
+    
+    async function updateAuthority() {
+        const authId = document.getElementById('updateAuthorityId').value;
+        const newName = document.getElementById('updateAuthorityName').value;
+        const btn = document.getElementById('updateAuthorityBtn');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`/api/authority/${authId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            });
+            
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('updateAuthorityModal')).hide();
+                showSuccess('Authority updated successfully!');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                const data = await response.json();
+                showError('Failed to update authority: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            showError('Failed to update authority: ' + error.message);
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    async function deleteAuthority(authId, authName) {
+        if (!confirm(`Are you sure you want to delete the authority "${authName}"?\n\nWARNING: This action cannot be undone. All issued credentials from this authority will become invalid.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/authority/${authId}`, { method: 'DELETE' });
+            
+            if (response.ok) {
+                showSuccess('Authority deleted successfully!');
+                setTimeout(() => location.href = '/', 1500);
+            } else {
+                const data = await response.json();
+                showError('Failed to delete authority: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            showError('Failed to delete authority: ' + error.message);
+        }
+    }
+    
+    async function listAuthorities() {
+        const modal = new bootstrap.Modal(document.getElementById('listAuthoritiesModal'));
+        modal.show();
+        
+        try {
+            const response = await fetch('/api/authority');
+            const authorities = await response.json();
+            
+            if (authorities.length === 0) {
+                document.getElementById('listAuthoritiesModalBody').innerHTML = `
+                    <div class="alert alert-info">No authorities found in this tenant.</div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Name</th><th>DID</th><th>Status</th><th>Linked Domains</th><th>Actions</th></tr></thead><tbody>';
+            authorities.forEach(auth => {
+                const linkedDomains = auth.didModel?.linkedDomainUrls?.join(', ') || '-';
+                html += `<tr>
+                    <td class="fw-bold">${auth.name}</td>
+                    <td style="font-size: 0.8rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis;">${auth.didModel?.did || '-'}</td>
+                    <td><span class="status-badge status-enabled">${auth.status}</span></td>
+                    <td style="font-size: 0.85rem;">${linkedDomains}</td>
+                    <td>
+                        <a href="/?authorityId=${auth.id}" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                    </td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
+            document.getElementById('listAuthoritiesModalBody').innerHTML = html;
+        } catch (error) {
+            document.getElementById('listAuthoritiesModalBody').innerHTML = `
+                <div class="alert alert-danger">Failed to load authorities: ${error.message}</div>
+            `;
+        }
+    }
+
+    // Authority Actions
+    async function generateDidDocument(authId) {
+        try {
+            showLoading();
+            const response = await fetch(`/api/authority/${authId}/generateDidDocument`, { method: 'POST' });
+            const data = await response.text();
+            showResult('DID Document', data);
+        } catch (error) {
+            showError('Failed to generate DID document: ' + error.message);
+        }
+    }
+    
+    function showWellKnownModal(authId) {
+        document.getElementById('wellKnownAuthorityId').value = authId;
+        new bootstrap.Modal(document.getElementById('wellKnownModal')).show();
+    }
+    
+    async function generateWellKnown() {
+        const authId = document.getElementById('wellKnownAuthorityId').value;
+        const domainUrl = document.getElementById('wellKnownDomainUrl').value;
+        
+        try {
+            showLoading();
+            const response = await fetch(`/api/authority/${authId}/generateWellKnownDidConfiguration`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domainUrl })
+            });
+            const data = await response.text();
+            bootstrap.Modal.getInstance(document.getElementById('wellKnownModal')).hide();
+            showResult('Well-Known DID Configuration', data);
+        } catch (error) {
+            showError('Failed to generate well-known configuration: ' + error.message);
+        }
+    }
+    
+    async function validateWellKnown(authId) {
+        try {
+            showLoading();
+            const response = await fetch(`/api/authority/${authId}/validateWellKnownDidConfiguration`, { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                showSuccess('Well-known DID configuration is valid!');
+            } else {
+                showError('Well-known DID configuration validation failed.');
+            }
+        } catch (error) {
+            showError('Failed to validate well-known configuration: ' + error.message);
+        }
+    }
+    
+    async function rotateSigningKey(authId) {
+        if (!confirm('Are you sure you want to rotate the signing key? You will need to re-register the DID document after this operation.')) {
+            return;
+        }
+        
+        try {
+            showLoading();
+            const response = await fetch(`/api/authority/${authId}/rotateSigningKey`, { method: 'POST' });
+            const data = await response.json();
+            showResult('Signing Key Rotated', JSON.stringify(data, null, 2));
+        } catch (error) {
+            showError('Failed to rotate signing key: ' + error.message);
+        }
+    }
+    
+    async function synchronizeWithDid(authId) {
+        try {
+            showLoading();
+            const response = await fetch(`/api/authority/${authId}/synchronizeWithDidDocument`, { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                showSuccess('Successfully synchronized with DID document!');
+            } else {
+                showError('Failed to synchronize with DID document.');
+            }
+        } catch (error) {
+            showError('Failed to synchronize: ' + error.message);
+        }
+    }
+    
+    // Create Contract Functions
+    let claimRowCounter = 1;
+    
+    function showCreateContractModal() {
+        document.getElementById('createContractForm').reset();
+        document.getElementById('createContractBgColor').value = '#2E7D32';
+        document.getElementById('createContractBgColorText').value = '#2E7D32';
+        document.getElementById('createContractTextColor').value = '#FFFFFF';
+        document.getElementById('createContractTextColorText').value = '#FFFFFF';
+        document.getElementById('createContractValidity').value = '2592000';
+        
+        // Reset claims list to single row
+        claimRowCounter = 1;
+        document.getElementById('claimsMappingList').innerHTML = `
+            <div class="row mb-2 claim-row" id="claimRow-0">
+                <div class="col-md-4">
+                    <input type="text" class="form-control claim-input" placeholder="Input Claim (e.g., given_name)" />
+                </div>
+                <div class="col-md-4">
+                    <input type="text" class="form-control claim-output" placeholder="Output Claim (e.g., firstName)" />
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check mt-2">
+                        <input class="form-check-input claim-required" type="checkbox" checked />
+                        <label class="form-check-label">Required</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-outline-danger" onclick="removeClaimRow(0)">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        new bootstrap.Modal(document.getElementById('createContractModal')).show();
+    }
+    
+    function addClaimRow() {
+        const list = document.getElementById('claimsMappingList');
+        const idx = claimRowCounter++;
+        const div = document.createElement('div');
+        div.className = 'row mb-2 claim-row';
+        div.id = `claimRow-${idx}`;
+        div.innerHTML = `
+            <div class="col-md-4">
+                <input type="text" class="form-control claim-input" placeholder="Input Claim (e.g., given_name)" />
+            </div>
+            <div class="col-md-4">
+                <input type="text" class="form-control claim-output" placeholder="Output Claim (e.g., firstName)" />
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mt-2">
+                    <input class="form-check-input claim-required" type="checkbox" checked />
+                    <label class="form-check-label">Required</label>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger" onclick="removeClaimRow(${idx})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        list.appendChild(div);
+    }
+    
+    function removeClaimRow(idx) {
+        const element = document.getElementById(`claimRow-${idx}`);
+        if (element) {
+            element.remove();
+        }
+    }
+    
+    // Sync color inputs
+    document.addEventListener('DOMContentLoaded', function() {
+        const bgColor = document.getElementById('createContractBgColor');
+        const bgColorText = document.getElementById('createContractBgColorText');
+        const textColor = document.getElementById('createContractTextColor');
+        const textColorText = document.getElementById('createContractTextColorText');
+        
+        if (bgColor && bgColorText) {
+            bgColor.addEventListener('input', () => bgColorText.value = bgColor.value);
+            bgColorText.addEventListener('input', () => bgColor.value = bgColorText.value);
+        }
+        if (textColor && textColorText) {
+            textColor.addEventListener('input', () => textColorText.value = textColor.value);
+            textColorText.addEventListener('input', () => textColor.value = textColorText.value);
+        }
+    });
+    
+    async function createContract() {
+        const btn = document.getElementById('createContractBtn');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        const authorityId = document.getElementById('createContractAuthorityId').value;
+        const contractName = document.getElementById('createContractName').value;
+        const vcType = document.getElementById('createContractVcType').value;
+        const attestationType = document.getElementById('createContractAttestationType').value;
+        
+        // Collect claims mapping
+        const claimRows = document.querySelectorAll('.claim-row');
+        const claimMappings = [];
+        claimRows.forEach(row => {
+            const inputClaim = row.querySelector('.claim-input').value.trim();
+            const outputClaim = row.querySelector('.claim-output').value.trim();
+            const required = row.querySelector('.claim-required').checked;
+            if (inputClaim && outputClaim) {
+                claimMappings.push({
+                    inputClaim: inputClaim,
+                    outputClaim: outputClaim,
+                    required: required,
+                    indexed: false,
+                    type: 'string'
+                });
+            }
+        });
+        
+        // Build attestations based on type
+        const attestations = {};
+        if (attestationType === 'idTokenHint') {
+            attestations.idTokenHints = [{
+                mapping: claimMappings,
+                required: true
+            }];
+        } else if (attestationType === 'selfIssued') {
+            attestations.selfIssued = {
+                mapping: claimMappings,
+                required: true
+            };
+        }
+        
+        const request = {
+            name: contractName,
+            rules: {
+                validityInterval: parseInt(document.getElementById('createContractValidity').value) || 2592000,
+                vc: {
+                    type: [vcType]
+                },
+                attestations: attestations
+            },
+            displays: [{
+                locale: 'en-US',
+                card: {
+                    title: document.getElementById('createContractTitle').value,
+                    issuedBy: document.getElementById('createContractIssuedBy').value,
+                    backgroundColor: document.getElementById('createContractBgColorText').value,
+                    textColor: document.getElementById('createContractTextColorText').value,
+                    description: document.getElementById('createContractDescription').value || ''
+                },
+                consent: {
+                    title: 'Consent',
+                    instructions: 'Please confirm you want to receive this credential.'
+                },
+                claims: claimMappings.map(c => ({
+                    claim: c.outputClaim,
+                    label: c.outputClaim.charAt(0).toUpperCase() + c.outputClaim.slice(1).replace(/([A-Z])/g, ' $1'),
+                    type: 'String'
+                }))
+            }]
+        };
+        
+        try {
+            const response = await fetch(`/api/contract/${authorityId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(request)
+            });
+            
+            if (response.ok || response.status === 201) {
+                bootstrap.Modal.getInstance(document.getElementById('createContractModal')).hide();
+                showSuccess('Contract created successfully!');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                const data = await response.json();
+                showError('Failed to create contract: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            showError('Failed to create contract: ' + error.message);
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    // Contract Actions
+    async function viewContract(authId, contractId) {
+        const modal = new bootstrap.Modal(document.getElementById('contractModal'));
+        modal.show();
+        
+        try {
+            const response = await fetch(`/api/contract/${authId}/${contractId}`);
+            const data = await response.json();
+            
+            document.getElementById('contractModalBody').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <div class="info-label">Name</div>
+                            <div class="info-value">${data.name}</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="info-label">Contract ID</div>
+                            <div class="info-value" style="font-size: 0.85rem;">${data.id}</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="info-label">Status</div>
+                            <span class="status-badge status-enabled">${data.status}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <div class="info-label">Manifest URL</div>
+                            <a href="${data.manifestUrl}" target="_blank" style="word-break: break-all;">${data.manifestUrl}</a>
+                        </div>
+                        <div class="mb-3">
+                            <div class="info-label">Available in VC Directory</div>
+                            <div>${data.availableInVcDirectory ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No'}</div>
+                        </div>
+                    </div>
+                </div>
+                <hr />
+                <h6>Rules</h6>
+                <pre class="bg-light p-3 rounded" style="max-height: 200px; overflow: auto;">${JSON.stringify(data.rules, null, 2)}</pre>
+                <h6>Display</h6>
+                <pre class="bg-light p-3 rounded" style="max-height: 200px; overflow: auto;">${JSON.stringify(data.displays, null, 2)}</pre>
+            `;
+        } catch (error) {
+            document.getElementById('contractModalBody').innerHTML = `
+                <div class="alert alert-danger">Failed to load contract details: ${error.message}</div>
+            `;
+        }
+    }
+    
+    function editContract(authId, contractId) {
+        alert('Contract editing feature coming soon!');
+    }
+    
+    // Edit Contract - store current contract data
+    let currentEditContract = null;
+    let groupOidCounter = 0;
+    
+    function toggleGroupOidsSection() {
+        const section = document.getElementById('groupOidsSection');
+        const enabled = document.getElementById('editIssueNotificationEnabled').checked;
+        section.style.display = enabled ? 'block' : 'none';
+    }
+    
+    function addGroupOid() {
+        const list = document.getElementById('groupOidsList');
+        const idx = groupOidCounter++;
+        const div = document.createElement('div');
+        div.className = 'input-group mb-2';
+        div.id = `groupOid-${idx}`;
+        div.innerHTML = `
+            <input type="text" class="form-control group-oid-input" placeholder="Group Object ID (GUID)">
+            <button type="button" class="btn btn-outline-danger" onclick="removeGroupOid(${idx})">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+        list.appendChild(div);
+    }
+    
+    function removeGroupOid(idx) {
+        const element = document.getElementById(`groupOid-${idx}`);
+        if (element) {
+            element.remove();
+        }
+    }
+    
+    async function editContract(authId, contractId) {
+        const modal = new bootstrap.Modal(document.getElementById('editContractModal'));
+        modal.show();
+        groupOidCounter = 0;
+        
+        try {
+            const response = await fetch(`/api/contract/${authId}/${contractId}`);
+            const data = await response.json();
+            currentEditContract = { authId, contractId, data };
+            groupOidCounter = (data.issueNotificationAllowedToGroupOids || []).length;
+            
+            document.getElementById('editContractModalBody').innerHTML = `
+                <form id="editContractForm">
+                    <input type="hidden" id="editAuthId" value="${authId}" />
+                    <input type="hidden" id="editContractId" value="${contractId}" />
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="info-label">Contract Name</div>
+                                <div class="info-value">${data.name}</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="info-label">Contract ID</div>
+                                <div class="info-value" style="font-size: 0.85rem;">${data.id}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="info-label">Manifest URL</div>
+                                <a href="${data.manifestUrl}" target="_blank" style="word-break: break-all; font-size: 0.85rem;">${data.manifestUrl}</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr />
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editAvailableInVcDirectory" ${data.availableInVcDirectory ? 'checked' : ''}>
+                                <label class="form-check-label" for="editAvailableInVcDirectory">
+                                    <strong>Available in VC Directory</strong>
+                                    <div class="text-muted small">Publish this contract in the Verifiable Credential Network</div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editAllowOverrideValidity" ${data.allowOverrideValidityIntervalOnIssuance ? 'checked' : ''}>
+                                <label class="form-check-label" for="editAllowOverrideValidity">
+                                    <strong>Allow Override Validity on Issuance</strong>
+                                    <div class="text-muted small">Allow createIssuanceRequest API to override credential expiry</div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr />
+                    
+                    <h6 class="mb-3"><i class="bi bi-bell me-2"></i>Issue Notification Settings</h6>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editIssueNotificationEnabled" ${data.issueNotificationEnabled ? 'checked' : ''} onchange="toggleGroupOidsSection()">
+                                <label class="form-check-label" for="editIssueNotificationEnabled">
+                                    <strong>Enable Issue Notifications</strong>
+                                    <div class="text-muted small">Notify users when this credential is ready for issuance</div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="groupOidsSection" class="mb-4" style="display: ${data.issueNotificationEnabled ? 'block' : 'none'};">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <label class="form-label"><strong>Allowed Group IDs</strong></label>
+                                <div class="text-muted small mb-2">Azure AD Group Object IDs that can receive this credential. Leave empty to allow all users.</div>
+                                
+                                <div id="groupOidsList">
+                                    ${(data.issueNotificationAllowedToGroupOids || []).map((oid, idx) => `
+                                        <div class="input-group mb-2" id="groupOid-${idx}">
+                                            <input type="text" class="form-control group-oid-input" value="${oid}" placeholder="Group Object ID (GUID)">
+                                            <button type="button" class="btn btn-outline-danger" onclick="removeGroupOid(${idx})">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addGroupOid()">
+                                    <i class="bi bi-plus-lg me-1"></i>Add Group ID
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr />
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Rules Definition</strong></label>
+                        <div class="text-muted small mb-2">Define attestation requirements and validity settings</div>
+                        <textarea class="form-control font-monospace" id="editRules" rows="12" style="font-size: 0.85rem;">${JSON.stringify(data.rules, null, 2)}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Display Definition</strong></label>
+                        <div class="text-muted small mb-2">Define how the credential appears in wallets</div>
+                        <textarea class="form-control font-monospace" id="editDisplays" rows="12" style="font-size: 0.85rem;">${JSON.stringify(data.displays, null, 2)}</textarea>
+                    </div>
+                </form>
+            `;
+        } catch (error) {
+            document.getElementById('editContractModalBody').innerHTML = `
+                <div class="alert alert-danger">Failed to load contract details: ${error.message}</div>
+            `;
+        }
+    }
+    
+    async function saveContract() {
+        const authId = document.getElementById('editAuthId').value;
+        const contractId = document.getElementById('editContractId').value;
+        const btn = document.getElementById('saveContractBtn');
+        
+        // Parse the JSON fields
+        let rules, displays;
+        try {
+            rules = JSON.parse(document.getElementById('editRules').value);
+        } catch (e) {
+            showError('Invalid JSON in Rules field: ' + e.message);
+            return;
+        }
+        
+        try {
+            displays = JSON.parse(document.getElementById('editDisplays').value);
+        } catch (e) {
+            showError('Invalid JSON in Display field: ' + e.message);
+            return;
+        }
+        
+        // Collect group OIDs
+        const groupOidInputs = document.querySelectorAll('.group-oid-input');
+        const groupOids = Array.from(groupOidInputs)
+            .map(input => input.value.trim())
+            .filter(val => val.length > 0);
+        
+        const issueNotificationEnabled = document.getElementById('editIssueNotificationEnabled').checked;
+        
+        const updateRequest = {
+            rules: rules,
+            displays: displays,
+            availableInVcDirectory: document.getElementById('editAvailableInVcDirectory').checked,
+            allowOverrideValidityIntervalOnIssuance: document.getElementById('editAllowOverrideValidity').checked,
+            issueNotificationEnabled: issueNotificationEnabled,
+            issueNotificationAllowedToGroupOids: issueNotificationEnabled ? groupOids : null
+        };
+        
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`/api/contract/${authId}/${contractId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateRequest)
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editContractModal')).hide();
+                showSuccess('Contract updated successfully!');
+                // Reload the page to show updated data
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showError('Failed to update contract: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            showError('Failed to update contract: ' + error.message);
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    // Credential Actions
+    document.getElementById('getCredentialForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const contractId = document.getElementById('getContractId').value;
+        const credentialId = document.getElementById('getCredentialId').value;
+        
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.classList.add('loading');
+        
+        try {
+            const response = await fetch(`/api/credential/${authorityId}/${contractId}/${encodeURIComponent(credentialId)}`);
+            const data = await response.json();
+            
+            document.getElementById('getCredentialResult').innerHTML = response.ok
+                ? `<div class="alert alert-success">
+                    <strong>Credential Found</strong>
+                    <pre class="mt-2 mb-0">${JSON.stringify(data, null, 2)}</pre>
+                   </div>`
+                : `<div class="alert alert-warning">Credential not found or error occurred.</div>`;
+        } catch (error) {
+            document.getElementById('getCredentialResult').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+        }
+    });
+    
+    document.getElementById('searchCredentialsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const contractId = document.getElementById('searchContractId').value;
+        const claimValue = document.getElementById('searchClaimValue').value;
+        
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.classList.add('loading');
+        
+        try {
+            const response = await fetch('/api/credential/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ authorityId, contractId, claimValue })
+            });
+            const data = await response.json();
+            
+            if (Array.isArray(data) && data.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>ID</th><th>Status</th><th>Issued At</th><th>Actions</th></tr></thead><tbody>';
+                data.forEach(cred => {
+                    html += `<tr>
+                        <td style="font-size: 0.85rem;">${cred.id}</td>
+                        <td><span class="status-badge status-${cred.status}">${cred.status}</span></td>
+                        <td>${cred.issuedAtTimestamp || cred.issuedAt || '-'}</td>
+                        <td><button class="btn btn-sm btn-outline-danger" onclick="quickRevoke('${contractId}', '${cred.id}')"><i class="bi bi-x-octagon"></i></button></td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+                document.getElementById('searchCredentialsResult').innerHTML = html;
+            } else {
+                document.getElementById('searchCredentialsResult').innerHTML = 
+                    '<div class="alert alert-info">No credentials found matching the search criteria.</div>';
+            }
+        } catch (error) {
+            document.getElementById('searchCredentialsResult').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+        }
+    });
+    
+    document.getElementById('revokeCredentialForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const contractId = document.getElementById('revokeContractId').value;
+        const credentialId = document.getElementById('revokeCredentialId').value;
+        
+        if (!confirm('Are you sure you want to revoke this credential? This action cannot be undone.')) {
+            return;
+        }
+        
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.classList.add('loading');
+        
+        try {
+            const response = await fetch('/api/credential/revoke', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ authorityId, contractId, credentialId })
+            });
+            const data = await response.json();
+            
+            document.getElementById('revokeCredentialResult').innerHTML = data.success
+                ? '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Credential revoked successfully!</div>'
+                : '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Failed to revoke credential.</div>';
+        } catch (error) {
+            document.getElementById('revokeCredentialResult').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+        }
+    });
+    
+    function quickRevoke(contractId, credentialId) {
+        document.getElementById('revokeContractId').value = contractId;
+        document.getElementById('revokeCredentialId').value = credentialId;
+        document.getElementById('revoke-tab').click();
+    }
+    
+    // Utility Functions
+    function showLoading() {
+        // Could add a global loading indicator
+    }
+    
+    function showResult(title, content) {
+        document.getElementById('resultModalTitle').textContent = title;
+        document.getElementById('resultModalBody').innerHTML = `<pre class="bg-light p-3 rounded" style="max-height: 400px; overflow: auto;">${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}</pre>`;
+        document.getElementById('resultCopyBtn').style.display = 'block';
+        new bootstrap.Modal(document.getElementById('resultModal')).show();
+    }
+    
+    function showSuccess(message) {
+        document.getElementById('resultModalTitle').innerHTML = '<i class="bi bi-check-circle text-success me-2"></i>Success';
+        document.getElementById('resultModalBody').innerHTML = `<div class="alert alert-success mb-0">${message}</div>`;
+        document.getElementById('resultCopyBtn').style.display = 'none';
+        new bootstrap.Modal(document.getElementById('resultModal')).show();
+    }
+    
+    function showError(message) {
+        document.getElementById('resultModalTitle').innerHTML = '<i class="bi bi-x-circle text-danger me-2"></i>Error';
+        document.getElementById('resultModalBody').innerHTML = `<div class="alert alert-danger mb-0">${message}</div>`;
+        document.getElementById('resultCopyBtn').style.display = 'none';
+        new bootstrap.Modal(document.getElementById('resultModal')).show();
+    }
+    
+    function copyResultToClipboard() {
+        const pre = document.querySelector('#resultModalBody pre');
+        if (pre) {
+            navigator.clipboard.writeText(pre.textContent);
+            alert('Copied to clipboard!');
+        }
+    }
+
+    // FaceCheck Functions
+    let faceCheckEnabled = false;
+    
+    async function loadFaceCheckStatus(authorityId, subscriptionId, resourceGroup) {
+        if (!subscriptionId || !resourceGroup) {
+            document.getElementById('faceCheckStatus').innerHTML = `
+                <span class="text-muted"><i class="bi bi-exclamation-triangle me-1"></i>Key Vault info required</span>
+            `;
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/authority/${authorityId}/facecheck?subscriptionId=${encodeURIComponent(subscriptionId)}&resourceGroup=${encodeURIComponent(resourceGroup)}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                faceCheckEnabled = data.enabled;
+                updateFaceCheckUI(data.enabled, data.location);
+            } else if (response.status === 403) {
+                // Authorization error - likely missing ARM permission
+                document.getElementById('faceCheckStatus').innerHTML = `
+                    <span class="status-badge" style="background: #fff3cd; color: #856404;">
+                        <i class="bi bi-shield-exclamation me-1"></i>Permission Required
+                    </span>
+                    <small class="d-block text-muted mt-1">
+                        User needs <strong>Contributor</strong> role on the subscription/resource group to manage Face Check.
+                    </small>
+                `;
+                document.getElementById('faceCheckToggleBtn').disabled = true;
+            } else {
+                const errorData = await response.json();
+                document.getElementById('faceCheckStatus').innerHTML = `
+                    <span class="status-badge" style="background: #f8d7da; color: #842029;"><i class="bi bi-x-circle me-1"></i>Error</span>
+                `;
+                console.error('FaceCheck status error:', errorData);
+            }
+        } catch (error) {
+            document.getElementById('faceCheckStatus').innerHTML = `
+                <span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Failed to check</span>
+            `;
+            console.error('FaceCheck status error:', error);
+        }
+    }
+    
+    function updateFaceCheckUI(enabled, location) {
+        const statusEl = document.getElementById('faceCheckStatus');
+        const btnEl = document.getElementById('faceCheckToggleBtn');
+        const btnTextEl = document.getElementById('faceCheckBtnText');
+        const locationEl = document.getElementById('faceCheckLocation');
+        
+        if (enabled) {
+            statusEl.innerHTML = `
+                <span class="status-badge status-enabled"><i class="bi bi-check-circle me-1"></i>Enabled</span>
+            `;
+            btnTextEl.textContent = 'Disable Face Check';
+            btnEl.classList.remove('btn-outline-primary', 'btn-outline-success');
+            btnEl.classList.add('btn-outline-danger');
+            btnEl.querySelector('i').className = 'bi bi-toggle-off me-1';
+            if (location) {
+                locationEl.value = location;
+            }
+            locationEl.disabled = true;
+        } else {
+            statusEl.innerHTML = `
+                <span class="status-badge" style="background: #e9ecef; color: #6c757d;"><i class="bi bi-x-circle me-1"></i>Disabled</span>
+            `;
+            btnTextEl.textContent = 'Enable Face Check';
+            btnEl.classList.remove('btn-outline-danger');
+            btnEl.classList.add('btn-outline-success');
+            btnEl.querySelector('i').className = 'bi bi-toggle-on me-1';
+            locationEl.disabled = false;
+        }
+        btnEl.disabled = false;
+    }
+    
+    async function toggleFaceCheck(authorityId, subscriptionId, resourceGroup) {
+        const btn = document.getElementById('faceCheckToggleBtn');
+        const btnText = document.getElementById('faceCheckBtnText');
+        const originalText = btnText.textContent;
+        
+        btn.disabled = true;
+        btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+        
+        try {
+            if (faceCheckEnabled) {
+                // Disable FaceCheck
+                const response = await fetch(`/api/authority/${authorityId}/facecheck/disable`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        subscriptionId: subscriptionId, 
+                        resourceGroup: resourceGroup 
+                    })
+                });
+                
+                if (response.ok) {
+                    faceCheckEnabled = false;
+                    updateFaceCheckUI(false);
+                    showSuccess('Face Check has been disabled successfully.');
+                } else {
+                    const error = await response.json();
+                    showError('Failed to disable Face Check: ' + (error.error || 'Unknown error'));
+                }
+            } else {
+                // Enable FaceCheck
+                const location = document.getElementById('faceCheckLocation').value;
+                const response = await fetch(`/api/authority/${authorityId}/facecheck/enable`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        subscriptionId: subscriptionId, 
+                        resourceGroup: resourceGroup,
+                        location: location
+                    })
+                });
+                
+                if (response.ok) {
+                    faceCheckEnabled = true;
+                    updateFaceCheckUI(true, location);
+                    showSuccess('Face Check has been enabled successfully. Billing will apply for Face Check verifications.');
+                } else {
+                    const error = await response.json();
+                    showError('Failed to enable Face Check: ' + (error.error || 'Unknown error'));
+                }
+            }
+        } catch (error) {
+            showError('Failed to toggle Face Check: ' + error.message);
+        }
+        
+        btn.disabled = false;
+        btnText.textContent = faceCheckEnabled ? 'Disable Face Check' : 'Enable Face Check';
+    }
+    
+    // Load FaceCheck status on page load if authority has KeyVault info
+    @if (Model.SelectedAuthority?.KeyVaultMetadata != null)
+    {
+        <text>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFaceCheckStatus(
+                '@Model.SelectedAuthority.Id', 
+                '@Model.SelectedAuthority.KeyVaultMetadata.SubscriptionId', 
+                '@Model.SelectedAuthority.KeyVaultMetadata.ResourceGroup'
+            );
+        });
+        </text>
+    }
+</script>
+}

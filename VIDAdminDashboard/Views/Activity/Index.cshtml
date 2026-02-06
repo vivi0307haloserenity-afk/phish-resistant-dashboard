@@ -1,0 +1,505 @@
+@model ActivityDashboardViewModel
+@{
+    ViewData["Title"] = "Activity Dashboard";
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-graph-up me-2"></i>Activity Dashboard</h4>
+    <a href="/" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<!-- TOP SECTION: Authorities Summary -->
+<div class="card section-card mb-4">
+    <div class="card-header">
+        <i class="bi bi-building me-2"></i>Authorities Summary
+    </div>
+    <div class="card-body">
+        @if (Model.Authorities.Count > 0)
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>DID</th>
+                            <th>Status</th>
+                            <th>Linked Domains</th>
+                            <th>DID Document Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var auth in Model.Authorities)
+                        {
+                            <tr class="@(auth.Id == Model.SelectedAuthority?.Id ? "table-primary" : "")">
+                                <td class="fw-bold">
+                                    <a href="@Url.Action("Index", "Activity", new { authorityId = auth.Id })">
+                                        @auth.Name
+                                    </a>
+                                </td>
+                                <td style="font-size: 0.8rem; max-width: 300px;">
+                                    <span class="text-truncate d-inline-block" style="max-width: 280px;" title="@auth.DidModel?.Did">
+                                        @auth.DidModel?.Did
+                                    </span>
+                                </td>
+                                <td><span class="status-badge status-enabled">@auth.Status</span></td>
+                                <td>
+                                    @if (auth.DidModel?.LinkedDomainUrls?.Any() == true)
+                                    {
+                                        foreach (var domain in auth.DidModel.LinkedDomainUrls)
+                                        {
+                                            <a href="@domain" target="_blank" class="d-block" style="font-size: 0.85rem;">@domain</a>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="status-badge @(auth.DidModel?.DidDocumentStatus == "published" ? "status-published" : "status-revoked")">
+                                        @auth.DidModel?.DidDocumentStatus
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-4">
+                <i class="bi bi-info-circle display-4 text-muted"></i>
+                <p class="mt-3 text-muted">No authorities found in this tenant.</p>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Filters Section -->
+<div class="card section-card mb-4">
+    <div class="card-header">
+        <i class="bi bi-funnel me-2"></i>Activity Filters
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Authority</label>
+                <select name="authorityId" class="form-select">
+                    @foreach (var auth in Model.Authorities)
+                    {
+                        <option value="@auth.Id" selected="@(auth.Id == Model.SelectedAuthority?.Id)">@auth.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Start Date</label>
+                <input type="date" name="startDate" class="form-control" value="@Model.StartDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">End Date</label>
+                <input type="date" name="endDate" class="form-control" value="@Model.EndDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-funnel me-1"></i> Apply Filters
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MIDDLE SECTION: Activity Summary Cards -->
+@if (Model.SelectedAuthority != null)
+{
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-activity display-6 text-primary"></i>
+                    <h3 class="mt-2 mb-0">@Model.Summary.TotalTransactions</h3>
+                    <small class="text-muted">Total Transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-file-earmark-plus display-6 text-info"></i>
+                    <h3 class="mt-2 mb-0">@Model.Summary.IssuanceCount</h3>
+                    <small class="text-muted">Issuances</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-eye display-6 text-secondary"></i>
+                    <h3 class="mt-2 mb-0">@Model.Summary.PresentationCount</h3>
+                    <small class="text-muted">Presentations</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center h-100 border-success">
+                <div class="card-body">
+                    <i class="bi bi-check-circle display-6 text-success"></i>
+                    <h3 class="mt-2 mb-0 text-success">@Model.Summary.SuccessCount</h3>
+                    <small class="text-muted">Successful</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center h-100 border-danger">
+                <div class="card-body">
+                    <i class="bi bi-x-circle display-6 text-danger"></i>
+                    <h3 class="mt-2 mb-0 text-danger">@Model.Summary.FailedCount</h3>
+                    <small class="text-muted">Failed</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-pie-chart me-2"></i>Transactions by Credential Type
+                </div>
+                <div class="card-body">
+                    @if (Model.Summary.TransactionsByCredentialType.Any())
+                    {
+                        <canvas id="credentialTypeChart" height="200"></canvas>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-pie-chart display-4"></i>
+                            <p class="mt-2">No data available</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-bar-chart me-2"></i>Transactions Over Time
+                </div>
+                <div class="card-body">
+                    @if (Model.Summary.TransactionsByDay.Any())
+                    {
+                        <canvas id="timelineChart" height="200"></canvas>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-bar-chart display-4"></i>
+                            <p class="mt-2">No data available</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions Table -->
+    <div class="card section-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>Recent Transactions</span>
+            <span class="badge bg-secondary">@Model.Transactions.Count transactions</span>
+        </div>
+        <div class="card-body">
+            @if (Model.Transactions.Count > 0)
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Action</th>
+                                <th>Credential Type</th>
+                                <th>Status</th>
+                                <th>Client</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tx in Model.Transactions.OrderByDescending(t => t.CompletionDateTime))
+                            {
+                                <tr>
+                                    <td style="font-size: 0.85rem;">
+                                        @(tx.CompletionDateTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")
+                                    </td>
+                                    <td>
+                                        @if (tx.Action?.Equals("issuance", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            <span class="badge bg-info"><i class="bi bi-file-earmark-plus me-1"></i>Issuance</span>
+                                        }
+                                        else if (tx.Action?.Equals("presentation", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            <span class="badge bg-secondary"><i class="bi bi-eye me-1"></i>Presentation</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-dark">@tx.Action</span>
+                                        }
+                                    </td>
+                                    <td style="font-size: 0.85rem;">@tx.CredentialType</td>
+                                    <td>
+                                        @if (tx.Status?.Equals("successful", StringComparison.OrdinalIgnoreCase) == true || 
+                                             tx.Status?.Equals("success", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            <span class="status-badge status-valid"><i class="bi bi-check me-1"></i>Success</span>
+                                        }
+                                        else if (tx.Status?.Equals("failed", StringComparison.OrdinalIgnoreCase) == true ||
+                                                 tx.Status?.Equals("failure", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            <span class="status-badge status-revoked"><i class="bi bi-x me-1"></i>Failed</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-dark">@tx.Status</span>
+                                        }
+                                    </td>
+                                    <td style="font-size: 0.85rem;">@(tx.ClientName ?? "-")</td>
+                                    <td style="font-size: 0.8rem;">
+                                        @if (!string.IsNullOrEmpty(tx.ErrorCode))
+                                        {
+                                            <span class="text-danger" title="@tx.ErrorMessage">@tx.ErrorCode</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-4 text-muted"></i>
+                    <p class="mt-3 text-muted">No transaction data available from the Transactions API.</p>
+                    @if (Model.AuditLogs.Count > 0)
+                    {
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> Activity statistics above are computed from <strong>@Model.AuditLogs.Count Entra ID audit log entries</strong>. 
+                            See the "Admin Audit Actions" section below for detailed activity.
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Try adjusting the date range or selecting a different authority.</p>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Admin Audit Actions Section -->
+    <div class="card section-card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #5c2d91 0%, #7b4bb4 100%); color: white;">
+            <span><i class="bi bi-journal-text me-2"></i>Admin Audit Actions (Entra ID Audit Logs)</span>
+            <span class="badge bg-light text-dark">@Model.AuditLogs.Count entries</span>
+        </div>
+        <div class="card-body">
+            @if (Model.AuditLogs.Count > 0)
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th style="width: 150px;">Date ↓</th>
+                                <th>Service</th>
+                                <th>Category</th>
+                                <th>Activity</th>
+                                <th>Status</th>
+                                <th>Status Reason</th>
+                                <th>Initiated By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Model.AuditLogs.OrderByDescending(l => l.ActivityDateTime))
+                            {
+                                <tr>
+                                    <td style="font-size: 0.85rem;">
+                                        <a href="#" class="text-primary" data-bs-toggle="tooltip" title="@log.ActivityDateTime.ToString("yyyy-MM-dd HH:mm:ss")">
+                                            @log.ActivityDateTime.ToString("MM/dd/yyyy, HH:mm:ss")
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background-color: #5c2d91;">@log.LoggedByService</span>
+                                    </td>
+                                    <td style="font-size: 0.85rem;">@log.Category</td>
+                                    <td style="font-size: 0.85rem;">
+                                        <span class="text-primary" title="@log.ActivityDisplayName">
+                                            @(log.ActivityDisplayName.Length > 30 ? log.ActivityDisplayName.Substring(0, 30) + "..." : log.ActivityDisplayName)
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (log.Result?.Equals("success", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            <span class="status-badge status-valid"><i class="bi bi-check me-1"></i>Success</span>
+                                        }
+                                        else if (log.Result?.Equals("failure", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            <span class="status-badge status-revoked"><i class="bi bi-x me-1"></i>Failure</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">@log.Result</span>
+                                        }
+                                    </td>
+                                    <td style="font-size: 0.85rem;">
+                                        @if (!string.IsNullOrEmpty(log.ResultReason))
+                                        {
+                                            <span class="@(log.Result?.Equals("success", StringComparison.OrdinalIgnoreCase) == true ? "text-success" : "text-danger")">
+                                                @log.ResultReason
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td style="font-size: 0.85rem;">
+                                        @if (log.InitiatedBy?.User != null && !string.IsNullOrEmpty(log.InitiatedBy.User.DisplayName))
+                                        {
+                                            <span title="@log.InitiatedBy.User.UserPrincipalName">
+                                                <i class="bi bi-person me-1"></i>@log.InitiatedBy.User.DisplayName
+                                            </span>
+                                        }
+                                        else if (log.InitiatedBy?.App != null && !string.IsNullOrEmpty(log.InitiatedBy.App.DisplayName))
+                                        {
+                                            <span title="App ID: @log.InitiatedBy.App.AppId">
+                                                <i class="bi bi-app me-1"></i>@log.InitiatedBy.App.DisplayName
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else if (Model.AuditLogConsentRequired)
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-shield-lock display-4 text-warning"></i>
+                    <p class="mt-3 text-muted">Permission required to view audit logs.</p>
+                    <p class="text-muted small mb-3">
+                        You need to grant consent for <strong>AuditLog.Read.All</strong> permission.<br/>
+                        Click the button below to sign out and sign back in to grant the permission.
+                    </p>
+                    <a href="@Url.Action("ConsentAuditLogs", "Activity")" class="btn btn-warning">
+                        <i class="bi bi-key me-1"></i>Grant Audit Log Permission
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-journal-text display-4 text-muted"></i>
+                    <p class="mt-3 text-muted">No Verified ID audit log entries found for the selected time period.</p>
+                    <p class="text-muted small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Make sure you have <strong>AuditLog.Read.All</strong> permission granted to the app.
+                    </p>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    // Credential Type Pie Chart
+    @if (Model.Summary.TransactionsByCredentialType.Any())
+    {
+        <text>
+        const ctxPie = document.getElementById('credentialTypeChart').getContext('2d');
+        new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+                labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Summary.TransactionsByCredentialType.Keys)),
+                datasets: [{
+                    data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Summary.TransactionsByCredentialType.Values)),
+                    backgroundColor: [
+                        '#0078d4', '#106ebe', '#00bcf2', '#008272', '#107c10', 
+                        '#5c2d91', '#b4009e', '#e81123', '#ff8c00', '#fff100'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        </text>
+    }
+
+    // Timeline Bar Chart
+    @if (Model.Summary.TransactionsByDay.Any())
+    {
+        <text>
+        const ctxBar = document.getElementById('timelineChart').getContext('2d');
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Summary.TransactionsByDay.Keys)),
+                datasets: [{
+                    label: 'Transactions',
+                    data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Summary.TransactionsByDay.Values)),
+                    backgroundColor: '#0078d4',
+                    borderColor: '#106ebe',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+        </text>
+    }
+</script>
+}
