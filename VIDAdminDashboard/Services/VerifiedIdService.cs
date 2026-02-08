@@ -491,7 +491,7 @@ public class VerifiedIdService : IVerifiedIdService
         {
             SetAuthHeader(accessToken);
             
-            // Format dates for the API - use ISO 8601 format
+            // Format dates for the API - use ISO 8601 format (yyyy-MM-ddTHH:mm:ssZ)
             var fromDateStr = startDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
             var toDateStr = endDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
             
@@ -503,18 +503,19 @@ public class VerifiedIdService : IVerifiedIdService
             _logger.LogInformation("Fetching transactions from VID Admin API: {Url}", url);
             
             var response = await _httpClient.GetAsync(url);
+            var content = await response.Content.ReadAsStringAsync();
+            
+            // Always log the raw response for debugging
+            _logger.LogInformation("VID Admin API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, content);
             
             if (response.IsSuccessStatusCode)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                _logger.LogDebug("Transactions response: {Content}", content);
-                
                 var result = JsonSerializer.Deserialize<TransactionListResponse>(content, JsonOptions);
                 var transactions = result?.Value ?? new List<VerifiedIdTransaction>();
                 
-                // Order and limit results
+                // Order and limit results using the computed TransactionDateTime property
                 transactions = transactions
-                    .OrderByDescending(t => t.CompletionDateTime)
+                    .OrderByDescending(t => t.TransactionDateTime)
                     .Take(top)
                     .ToList();
                 
@@ -522,8 +523,7 @@ public class VerifiedIdService : IVerifiedIdService
                 return transactions;
             }
             
-            var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogWarning("VID Admin API transactions failed ({StatusCode}): {Error}", response.StatusCode, errorContent);
+            _logger.LogWarning("VID Admin API transactions failed ({StatusCode}): {Error}", response.StatusCode, content);
             return new List<VerifiedIdTransaction>();
         }
         catch (Exception ex)

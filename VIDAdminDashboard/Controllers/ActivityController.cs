@@ -144,12 +144,17 @@ public class ActivityController : Controller
         if (transactions.Count > 0)
         {
             summary.TotalTransactions = transactions.Count;
-            summary.IssuanceCount = transactions.Count(t => t.Action?.Equals("issuance", StringComparison.OrdinalIgnoreCase) == true);
-            summary.PresentationCount = transactions.Count(t => t.Action?.Equals("presentation", StringComparison.OrdinalIgnoreCase) == true);
-            summary.SuccessCount = transactions.Count(t => t.Status?.Equals("successful", StringComparison.OrdinalIgnoreCase) == true || 
-                                                        t.Status?.Equals("success", StringComparison.OrdinalIgnoreCase) == true);
-            summary.FailedCount = transactions.Count(t => t.Status?.Equals("failed", StringComparison.OrdinalIgnoreCase) == true ||
-                                                      t.Status?.Equals("failure", StringComparison.OrdinalIgnoreCase) == true);
+            summary.IssuanceCount = transactions.Count(t => 
+                t.ActionDisplay.Contains("issuance", StringComparison.OrdinalIgnoreCase) ||
+                t.ActionDisplay.Contains("issue", StringComparison.OrdinalIgnoreCase));
+            summary.PresentationCount = transactions.Count(t => 
+                t.ActionDisplay.Contains("presentation", StringComparison.OrdinalIgnoreCase) ||
+                t.ActionDisplay.Contains("present", StringComparison.OrdinalIgnoreCase));
+            summary.SuccessCount = transactions.Count(t => 
+                t.Status?.Contains("success", StringComparison.OrdinalIgnoreCase) == true ||
+                t.Status?.Contains("succeeded", StringComparison.OrdinalIgnoreCase) == true);
+            summary.FailedCount = transactions.Count(t => 
+                t.Status?.Contains("fail", StringComparison.OrdinalIgnoreCase) == true);
 
             // Group by credential type
             summary.TransactionsByCredentialType = transactions
@@ -157,10 +162,10 @@ public class ActivityController : Controller
                 .GroupBy(t => t.CredentialType)
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // Group by day
+            // Group by day - use the computed TransactionDateTime property
             summary.TransactionsByDay = transactions
-                .Where(t => t.CompletionDateTime.HasValue)
-                .GroupBy(t => t.CompletionDateTime!.Value.Date.ToString("yyyy-MM-dd"))
+                .Where(t => t.TransactionDateTime.HasValue)
+                .GroupBy(t => t.TransactionDateTime!.Value.Date.ToString("yyyy-MM-dd"))
                 .OrderBy(g => g.Key)
                 .ToDictionary(g => g.Key, g => g.Count());
         }

@@ -1,17 +1,66 @@
+using System.Text.Json.Serialization;
+
 namespace VIDAdminDashboard.Models;
 
 public class VerifiedIdTransaction
 {
+    [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
+    
+    [JsonPropertyName("authorityDid")]
     public string AuthorityDid { get; set; } = string.Empty;
+    
+    [JsonPropertyName("credentialType")]
     public string CredentialType { get; set; } = string.Empty;
-    public string Action { get; set; } = string.Empty;
+    
+    // API may return "action" or "activity" or "type"
+    [JsonPropertyName("action")]
+    public string? Action { get; set; }
+    
+    [JsonPropertyName("activity")]
+    public string? Activity { get; set; }
+    
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+    
+    // Computed property to get the action from any available field
+    [JsonIgnore]
+    public string ActionDisplay => Action ?? Activity ?? Type ?? "Unknown";
+    
+    [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
+    
+    [JsonPropertyName("completionDateTime")]
     public DateTime? CompletionDateTime { get; set; }
+    
+    [JsonPropertyName("timestamp")]
+    public DateTime? Timestamp { get; set; }
+    
+    [JsonPropertyName("time")]
+    public DateTime? Time { get; set; }
+    
+    // Computed property to get datetime from any available field
+    [JsonIgnore]
+    public DateTime? TransactionDateTime => CompletionDateTime ?? Timestamp ?? Time;
+    
+    [JsonPropertyName("errorCode")]
     public string? ErrorCode { get; set; }
+    
+    [JsonPropertyName("errorMessage")]
     public string? ErrorMessage { get; set; }
+    
+    [JsonPropertyName("clientName")]
     public string? ClientName { get; set; }
+    
+    [JsonPropertyName("clientId")]
     public string? ClientId { get; set; }
+    
+    [JsonPropertyName("applicationId")]
+    public string? ApplicationId { get; set; }
+    
+    // Computed property to get client ID from any available field
+    [JsonIgnore]
+    public string? ClientIdDisplay => ClientId ?? ApplicationId;
 }
 
 public class TransactionListResponse

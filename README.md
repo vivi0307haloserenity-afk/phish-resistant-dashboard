@@ -6,12 +6,8 @@ It demonstrates how the Admin APIs can be used to explore, manage, and visualize
 
 ⚠️ Disclaimer
 
-This is an exploratory sample, not an official Microsoft product
-
-Not supported by Microsoft
-
-Not intended for production use
-
-APIs and behavior may change without notice
-
-Use this project for learning, experimentation, and reference only.
+- This is an exploratory sample, not an official Microsoft product
+- Not supported by Microsoft 
+- Not intended for production use
+- APIs and behavior may change without notice
+- Use this project for learning, experimentation, and reference only.
