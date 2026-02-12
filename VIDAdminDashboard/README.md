@@ -6,11 +6,11 @@ A comprehensive web application for managing Microsoft Entra Verified ID through
 ![Azure](https://img.shields.io/badge/Azure-Entra%20ID-0078D4?style=flat&logo=microsoft-azure)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-## � Deploy to Azure
+## 🚀 Deploy to Azure
 
 Complete the [setup](#-getting-started) before deploying to Azure so that you have all the required parameters.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Frogulati%2Fentra-verifiedid-admin-dashboard%2Fmain%2FVIDAdminDashboard%2FARMTemplate%2Ftemplate.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FJasSuri%2Fphish-resistant-dashboard%2Ffeature%2Fphishing-resistant-dashboard%2FVIDAdminDashboard%2FARMTemplate%2Ftemplate.json)
 
 You will be asked to enter the following parameters during deployment:
 
@@ -75,6 +75,18 @@ After deployment, update your app registration with the redirect URI:
 - **Visual Charts** - Transactions by credential type and over time
 - **Date Range Filtering** - Filter activity by custom date ranges
 
+### Passwordless & Phishing-Resistant Activity Dashboard
+- **Tenant Security Status** - Mutually exclusive user tiers: Phishing-Resistant, Passwordless (non-PR), MFA Only, Password Only
+- **Phishing-Resistant Breakdown** - Granular sub-tiers: FIDO2 Hardware Key, Authenticator Passkey, Synced Passkey, Device-bound Passkey
+- **Journey Progress Banner** - Maturity rating with percentage-based KPIs against tenant user baseline
+- **Global Administrator Security Status** - Per-admin auth method inventory with strength classification
+- **Phishing-Resistant Enforcement** - CA policy analysis showing enforcing/report-only policies, user & app coverage, exclusions, and verdict badge
+- **Security Tier Distribution Chart** - 7-tier doughnut chart visualizing the full auth strength spectrum
+- **Last 24h Sign-ins by Auth Method** - Horizontal stacked bar chart (success/failure) from Graph audit logs
+- **Registration Breakdown Table** - Method-level registration counts with phishing-resistant classification badges
+- **Force Refresh** - Manual cache invalidation to get real-time data
+- **Authentication Method Configuration** - FIDO2, Microsoft Authenticator, and policy-level settings
+
 ### Admin Audit Actions
 - **View Admin Activities** - Track administrative actions on authorities and contracts
 - **Export Actions** - Export audit trails to CSV for compliance
@@ -98,11 +110,11 @@ After deployment, update your app registration with the redirect URI:
 ├─────────────────────────────────────────────────────────────────┤
 │  ASP.NET Core 8.0 MVC                                           │
 │  ├── Controllers (Home, Authority, Contract, Credential,        │
-│  │               Activity, AuditActions, FaceCheck)             │
-│  ├── Services (VerifiedIdService)                               │
-│  └── Views (Razor Views with Bootstrap 5)                       │
+│  │    Activity, Passwordless, PasswordlessApi)                  │
+│  ├── Services (VerifiedIdService, PasswordlessService)          │
+│  └── Views (Razor Views with Bootstrap 5 + Chart.js 4.4.1)     │
 ├─────────────────────────────────────────────────────────────────┤
-│  Microsoft.Identity.Web (MSAL)                                  │
+│  Microsoft.Identity.Web (MSAL) + IMemoryCache                   │
 │  └── OpenID Connect Authentication                              │
 ├─────────────────────────────────────────────────────────────────┤
 │                         APIs                                    │
@@ -110,7 +122,13 @@ After deployment, update your app registration with the redirect URI:
 │  │   ├── Authorities, Contracts, Credentials                   │
 │  │   └── Transactions (/beta/.../{authorityId}/transactions)   │
 │  ├── Microsoft Graph API (graph.microsoft.com)                  │
-│  │   └── Audit Logs (/v1.0/auditLogs/directoryAudits)          │
+│  │   ├── Audit Logs (/v1.0/auditLogs/directoryAudits)          │
+│  │   ├── Auth Reports (beta: usersRegisteredByMethod/Feature)  │
+│  │   ├── Sign-in Logs (beta: auditLogs/signIns)                │
+│  │   ├── Role Assignments (v1.0: roleManagement/directory)     │
+│  │   ├── User Auth Methods (v1.0: users/{id}/authentication)   │
+│  │   ├── Conditional Access (v1.0: identity/conditionalAccess) │
+│  │   └── Auth Strength Policies (v1.0: policies/...)           │
 │  └── Azure Resource Manager (management.azure.com)              │
 │      └── FaceCheck Configuration                                │
 └─────────────────────────────────────────────────────────────────┘
@@ -160,11 +178,15 @@ After deployment, update your app registration with the redirect URI:
    - Check `full_access`
    - Click **Add permissions**
    
-   **For Microsoft Graph (Audit Logs):**
+   **For Microsoft Graph (Audit Logs & Passwordless Dashboard):**
    - Click **Add a permission** → **Microsoft Graph** → **Delegated permissions**
    - Add: `User.Read`
-   - Add: `AuditLog.Read.All` (for audit logs)
-   - (Optional) Add: `Reports.Read.All` for extended reporting
+   - Add: `AuditLog.Read.All` (for audit logs & sign-in analytics)
+   - Add: `Reports.Read.All` (for auth method registration reports)
+   - Add: `User.Read.All` (for tenant user count & group member resolution)
+   - Add: `Directory.Read.All` (for role assignments & directory roles)
+   - Add: `UserAuthenticationMethod.Read.All` (for per-user auth method details)
+   - Add: `Policy.Read.All` (for Conditional Access & auth strength policies)
    
    **For Face Check Management (ARM API):**
    - Click **Add a permission** → **APIs my organization uses**
@@ -234,8 +256,8 @@ dotnet user-secrets set "AzureAd:ClientSecret" "your-secret-here"
 
 ```bash
 # Clone the repository
-git clone https://github.com/rogulati/entra-verifiedid-admin-dashboard.git
-cd entra-verifiedid-admin-dashboard/VIDAdminDashboard
+git clone https://github.com/JasSuri/phish-resistant-dashboard.git
+cd phish-resistant-dashboard/entra-verifiedid-admin-dashboard/VIDAdminDashboard
 
 # Restore dependencies
 dotnet restore
@@ -260,7 +282,7 @@ The application will be available at:
 
 The easiest way to deploy is using the **Deploy to Azure** button at the top of this README. This creates an Azure App Service on the Free tier with all required configuration.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Frogulati%2Fentra-verifiedid-admin-dashboard%2Fmain%2FVIDAdminDashboard%2FARMTemplate%2Ftemplate.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FJasSuri%2Fphish-resistant-dashboard%2Ffeature%2Fphishing-resistant-dashboard%2FVIDAdminDashboard%2FARMTemplate%2Ftemplate.json)
 
 After deployment:
 1. Go to your App Service in Azure Portal
@@ -386,13 +408,22 @@ Base URL: `https://verifiedid.did.msidentity.com`
 | `/v1.0/verifiableCredentials/authorities/{id}/didInfo/generateDidDocument` | POST | Generate DID document |
 | `/v1.0/verifiableCredentials/authorities/{id}/validateWellKnownDidConfiguration` | POST | Validate domain configuration |
 
-### Microsoft Graph API (Audit Logs)
+### Microsoft Graph API (Audit Logs & Passwordless Dashboard)
 
-Base URL: `https://graph.microsoft.com/v1.0`
+Base URL: `https://graph.microsoft.com`
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/auditLogs/directoryAudits` | GET | List audit log entries |
+| Endpoint | Version | Method | Description |
+|----------|---------|--------|-------------|
+| `/auditLogs/directoryAudits` | v1.0 | GET | List audit log entries |
+| `/reports/authenticationMethods/usersRegisteredByMethod` | beta | GET | Registration counts per auth method |
+| `/reports/authenticationMethods/usersRegisteredByFeature` | beta | GET | Feature-level registration (MFA, passwordless, etc.) |
+| `/users/$count` | v1.0 | GET | Total/enabled user count |
+| `/auditLogs/signIns` | beta | GET | Sign-in logs (last 24h, top 200) |
+| `/roleManagement/directory/roleAssignments` | v1.0 | GET | Role assignments (e.g., Global Admin) |
+| `/users/{id}/authentication/methods` | v1.0 | GET | Per-user registered auth methods |
+| `/groups/{id}/transitiveMembers/microsoft.graph.user` | v1.0 | GET | Group member resolution for role-assigned groups |
+| `/identity/conditionalAccess/policies` | v1.0 | GET | Conditional Access policies |
+| `/policies/authenticationStrengthPolicies` | v1.0 | GET | Auth strength policy definitions |
 
 **Query Parameters for Audit Logs:**
 - `$filter` - Filter by `loggedByService eq 'Verified ID'` and date range
@@ -403,6 +434,8 @@ Base URL: `https://graph.microsoft.com/v1.0`
 ```
 GET /v1.0/auditLogs/directoryAudits?$filter=loggedByService eq 'Verified ID' and activityDateTime ge 2026-01-01T00:00:00Z&$top=100&$orderby=activityDateTime desc
 ```
+
+**Note on Sign-in Logs:** Error code `50140` (Interrupted) is treated as a successful sign-in when `authenticationDetails` contains a credential with `succeeded: true`. The "Previously satisfied" auth method is filtered from chart results.
 
 ### Azure Resource Manager API (FaceCheck)
 
@@ -418,39 +451,42 @@ Base URL: `https://management.azure.com`
 ```
 VIDAdminDashboard/
 ├── Controllers/
-│   ├── HomeController.cs          # Main dashboard
-│   ├── AuthorityController.cs     # Authority CRUD operations
-│   ├── ContractController.cs      # Contract operations
-│   ├── CredentialController.cs    # Credential operations
-│   ├── ActivityController.cs      # Activity dashboard & transactions
-│   ├── AuditActionsController.cs  # Admin audit actions tracking
-│   └── FaceCheckController.cs     # FaceCheck management
+│   ├── HomeController.cs              # Main dashboard
+│   ├── AuthorityController.cs         # Authority CRUD operations
+│   ├── ContractController.cs          # Contract operations
+│   ├── CredentialController.cs        # Credential operations
+│   ├── ActivityController.cs          # Activity dashboard & transactions
+│   ├── PasswordlessController.cs      # Passwordless activity dashboard (MVC)
+│   └── PasswordlessApiController.cs   # Passwordless REST API endpoints
 ├── Models/
-│   ├── Authority.cs               # Authority model & related types
-│   ├── Contract.cs                # Contract model & attestations
-│   ├── Credential.cs              # Credential model
-│   ├── ViewModels.cs              # Dashboard view models
-│   ├── ActivityModels.cs          # Activity/transaction models
-│   └── FaceCheckModels.cs         # FaceCheck configuration models
+│   ├── Authority.cs                   # Authority model & related types
+│   ├── Contract.cs                    # Contract model & attestations
+│   ├── Credential.cs                  # Credential model
+│   ├── ViewModels.cs                  # Dashboard view models
+│   ├── ActivityModels.cs              # Activity/transaction models
+│   └── PasswordlessModels.cs          # Passwordless dashboard models
 ├── Services/
-│   ├── IVerifiedIdService.cs      # Service interface
-│   └── VerifiedIdService.cs       # API client implementation
+│   ├── IVerifiedIdService.cs          # Verified ID service interface
+│   ├── VerifiedIdService.cs           # Verified ID API client
+│   ├── IPasswordlessService.cs        # Passwordless service interface
+│   └── PasswordlessService.cs         # Graph API client with IMemoryCache
 ├── Views/
 │   ├── Home/
-│   │   └── Index.cshtml           # Main admin dashboard
+│   │   └── Index.cshtml               # Main admin dashboard
 │   ├── Activity/
-│   │   └── Index.cshtml           # Activity dashboard
-│   ├── AuditActions/
-│   │   └── Index.cshtml           # Admin audit actions
-│   ├── FaceCheck/
-│   │   └── Index.cshtml           # FaceCheck management
+│   │   └── Index.cshtml               # Activity dashboard
+│   ├── Passwordless/
+│   │   ├── Activity.cshtml            # Passwordless activity dashboard
+│   │   └── Configuration.cshtml       # Auth method configuration
 │   └── Shared/
-│       ├── _Layout.cshtml         # Main layout
-│       └── Error.cshtml           # Error page
-├── wwwroot/                        # Static files
-├── Program.cs                      # Application entry point
-├── appsettings.json               # Configuration
-└── VIDAdminDashboard.csproj       # Project file
+│       ├── _Layout.cshtml             # Main layout with sidebar nav
+│       └── Error.cshtml               # Error page
+├── ARMTemplate/
+│   └── template.json                  # Azure deployment template
+├── Program.cs                          # Application entry point
+├── appsettings.json                   # Configuration (placeholders only)
+├── appsettings.Development.json       # Local secrets (gitignored)
+└── VIDAdminDashboard.csproj           # Project file
 ```
 
 ## 🔧 Troubleshooting
@@ -556,6 +592,22 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Microsoft Identity Web Documentation](https://learn.microsoft.com/en-us/entra/msal/dotnet/microsoft-identity-web/)
 
 ## 📝 Changelog
+
+### v1.2.0 (February 2026)
+- **Passwordless & Phishing-Resistant Activity Dashboard** - Executive-level view of tenant auth posture
+  - Mutually exclusive user tiers (PR, Passwordless, MFA Only, Password Only)
+  - Phishing-resistant sub-tier breakdown (FIDO2, Authenticator Passkey, Synced Passkey, Device-bound Passkey)
+  - Journey progress banner with maturity rating against tenant baseline
+  - Phishing-resistant enforcement analysis via Conditional Access policies
+- **Global Administrator Security Status** - Per-admin auth method inventory using `roleManagement/directory/roleAssignments` (captures permanent, PIM-active, and group-based assignments)
+- **Last 24h Sign-in Analytics** - Stacked bar chart by auth method with success/failure breakdown
+- **Security Tier Distribution Chart** - 7-tier doughnut visualization
+- **Registration Breakdown Table** - Method-level counts with PR classification badges
+- **Force Refresh** - Manual cache invalidation across all data sources
+- **Auth Method Configuration View** - FIDO2, Microsoft Authenticator, and policy settings
+- **Performance Optimized** - Pre-aggregated Graph API endpoints with IMemoryCache (tiered TTLs) for 1M+ user tenants
+- **Sign-in Classification** - Error code 50140 (Interrupted) treated as success when auth detail shows succeeded credential
+- **Secrets Management** - `appsettings.Development.json` gitignored, placeholders in committed config
 
 ### v1.1.0 (February 2026)
 - **Activity Dashboard** - Now uses VID Admin API `/beta/verifiableCredentials/authorities/{id}/transactions` endpoint
