@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Microsoft Identity authentication
 builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
-    .EnableTokenAcquisitionToCallDownstreamApi(new[] { 
+    .EnableTokenAcquisitionToCallDownstreamApi(new[] {
         "6a8b4b39-c021-437c-b060-5a14a3fd65f3/full_access"
     })
     .AddInMemoryTokenCaches();
@@ -19,7 +19,9 @@ builder.Services.AddAuthorization(options =>
 });
 
 // Add services
+builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IVerifiedIdService, VerifiedIdService>();
+builder.Services.AddHttpClient<IPasswordlessService, PasswordlessService>();
 builder.Services.AddControllersWithViews()
     .AddMicrosoftIdentityUI();
 

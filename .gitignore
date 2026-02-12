@@ -45,6 +45,9 @@ bld/
 *.user
 *.suo
 
+# Local settings with secrets
+appsettings.Development.json
+
 # NuGet Packages
 *.nupkg
 *.snupkg

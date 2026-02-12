@@ -1,0 +1,400 @@
+@model VIDAdminDashboard.Models.PasswordlessConfigViewModel
+@{
+    ViewData["Title"] = "Passwordless Configuration";
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>@Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Toast for notifications -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+    <div id="saveToast" class="toast align-items-center border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="toastMessage"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<!-- FIDO2 Security Keys / Passkeys -->
+<div class="card section-card mb-4">
+    <div class="card-header d-flex align-items-center">
+        <i class="bi bi-key me-2"></i> FIDO2 Security Keys / Passkeys
+        @if (Model.Fido2Config != null)
+        {
+            <span class="ms-auto status-badge @(Model.Fido2Config.State == "enabled" ? "status-enabled" : "status-disabled")">
+                @Model.Fido2Config.State
+            </span>
+        }
+    </div>
+    <div class="card-body" id="fido2Section">
+        @if (Model.Fido2Config == null)
+        {
+            <p class="text-muted">Unable to load FIDO2 configuration. Ensure you have Policy.Read.All permission.</p>
+        }
+        else
+        {
+            <div class="row g-4">
+                <!-- Enable/Disable -->
+                <div class="col-md-6">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="fido2Enabled"
+                               @(Model.Fido2Config.State == "enabled" ? "checked" : "")>
+                        <label class="form-check-label fw-semibold" for="fido2Enabled">Enable FIDO2 Security Keys</label>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="fido2SelfService"
+                               @(Model.Fido2Config.IsSelfServiceRegistrationAllowed ? "checked" : "")>
+                        <label class="form-check-label" for="fido2SelfService">Allow self-service registration</label>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="fido2Attestation"
+                               @(Model.Fido2Config.IsAttestationEnforced ? "checked" : "")>
+                        <label class="form-check-label" for="fido2Attestation">Enforce attestation</label>
+                    </div>
+                </div>
+
+                <!-- Key Restrictions -->
+                <div class="col-md-6">
+                    <h6 class="fw-semibold mb-3"><i class="bi bi-funnel me-1"></i> Key Restrictions</h6>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="fido2KeyRestrictionsEnforced"
+                               @(Model.Fido2Config.KeyRestrictions?.IsEnforced == true ? "checked" : "")>
+                        <label class="form-check-label" for="fido2KeyRestrictionsEnforced">Enforce key restrictions</label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label info-label">Enforcement Type</label>
+                        @{
+                            var isBlock = Model.Fido2Config.KeyRestrictions?.EnforcementType == "block";
+                            var isAllow = Model.Fido2Config.KeyRestrictions?.EnforcementType == "allow";
+                        }
+                        <select class="form-select form-select-sm" id="fido2EnforcementType">
+                            @if (isBlock) { <option value="block" selected>Block listed keys</option> } else { <option value="block">Block listed keys</option> }
+                            @if (isAllow) { <option value="allow" selected>Allow listed keys only</option> } else { <option value="allow">Allow listed keys only</option> }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label info-label">AAGUID List</label>
+                        <div id="aaguidList">
+                            @if (Model.Fido2Config.KeyRestrictions?.AaGuids != null)
+                            {
+                                @foreach (var guid in Model.Fido2Config.KeyRestrictions.AaGuids)
+                                {
+                                    <div class="input-group input-group-sm mb-1 aaguid-row">
+                                        <input type="text" class="form-control aaguid-input" value="@guid" placeholder="AAGUID" />
+                                        <button class="btn btn-outline-danger btn-sm" type="button" onclick="this.closest('.aaguid-row').remove();">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" id="addAaguid">
+                            <i class="bi bi-plus me-1"></i>Add AAGUID
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Include/Exclude Targets -->
+                <div class="col-12">
+                    <h6 class="fw-semibold mb-2"><i class="bi bi-people me-1"></i> Target Groups</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label info-label">Include Targets</label>
+                            <div class="border rounded p-2" style="min-height: 40px;">
+                                @foreach (var target in Model.Fido2Config.IncludeTargets)
+                                {
+                                    <span class="badge bg-primary me-1">@target.Id (@target.TargetType)</span>
+                                }
+                                @if (Model.Fido2Config.IncludeTargets.Count == 0)
+                                {
+                                    <small class="text-muted">No include targets configured</small>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label info-label">Exclude Targets</label>
+                            <div class="border rounded p-2" style="min-height: 40px;">
+                                @foreach (var target in Model.Fido2Config.ExcludeTargets)
+                                {
+                                    <span class="badge bg-secondary me-1">@target.Id (@target.TargetType)</span>
+                                }
+                                @if (Model.Fido2Config.ExcludeTargets.Count == 0)
+                                {
+                                    <small class="text-muted">No exclude targets configured</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save -->
+                <div class="col-12">
+                    <button class="btn btn-primary" id="saveFido2" onclick="saveFido2Config()">
+                        <span class="spinner-border spinner-border-sm loading-spinner me-1"></span>
+                        <i class="bi bi-check-lg me-1"></i> Save FIDO2 Configuration
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Microsoft Authenticator -->
+<div class="card section-card mb-4">
+    <div class="card-header d-flex align-items-center">
+        <i class="bi bi-phone me-2"></i> Microsoft Authenticator
+        @if (Model.AuthenticatorConfig != null)
+        {
+            <span class="ms-auto status-badge @(Model.AuthenticatorConfig.State == "enabled" ? "status-enabled" : "status-disabled")">
+                @Model.AuthenticatorConfig.State
+            </span>
+        }
+    </div>
+    <div class="card-body" id="authenticatorSection">
+        @if (Model.AuthenticatorConfig == null)
+        {
+            <p class="text-muted">Unable to load Authenticator configuration. Ensure you have Policy.Read.All permission.</p>
+        }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="authEnabled"
+                               @(Model.AuthenticatorConfig.State == "enabled" ? "checked" : "")>
+                        <label class="form-check-label fw-semibold" for="authEnabled">Enable Microsoft Authenticator</label>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="fw-semibold mb-3"><i class="bi bi-sliders me-1"></i> Feature Settings</h6>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="authDisplayAppInfo"
+                               @(Model.AuthenticatorConfig.FeatureSettings?.DisplayAppInformationRequiredState?.State == "enabled" ? "checked" : "")>
+                        <label class="form-check-label" for="authDisplayAppInfo">Show application name in push notifications</label>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="authDisplayLocation"
+                               @(Model.AuthenticatorConfig.FeatureSettings?.DisplayLocationInformationRequiredState?.State == "enabled" ? "checked" : "")>
+                        <label class="form-check-label" for="authDisplayLocation">Show geographic location in push notifications</label>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="authCompanionApp"
+                               @(Model.AuthenticatorConfig.FeatureSettings?.CompanionAppAllowedState?.State == "enabled" ? "checked" : "")>
+                        <label class="form-check-label" for="authCompanionApp">Allow companion app</label>
+                    </div>
+                </div>
+
+                <!-- Include/Exclude Targets -->
+                <div class="col-12">
+                    <h6 class="fw-semibold mb-2"><i class="bi bi-people me-1"></i> Target Groups</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label info-label">Include Targets</label>
+                            <div class="border rounded p-2" style="min-height: 40px;">
+                                @foreach (var target in Model.AuthenticatorConfig.IncludeTargets)
+                                {
+                                    <span class="badge bg-primary me-1">@target.Id (@target.TargetType)</span>
+                                }
+                                @if (Model.AuthenticatorConfig.IncludeTargets.Count == 0)
+                                {
+                                    <small class="text-muted">No include targets configured</small>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label info-label">Exclude Targets</label>
+                            <div class="border rounded p-2" style="min-height: 40px;">
+                                @foreach (var target in Model.AuthenticatorConfig.ExcludeTargets)
+                                {
+                                    <span class="badge bg-secondary me-1">@target.Id (@target.TargetType)</span>
+                                }
+                                @if (Model.AuthenticatorConfig.ExcludeTargets.Count == 0)
+                                {
+                                    <small class="text-muted">No exclude targets configured</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save -->
+                <div class="col-12">
+                    <button class="btn btn-primary" id="saveAuthenticator" onclick="saveAuthenticatorConfig()">
+                        <span class="spinner-border spinner-border-sm loading-spinner me-1"></span>
+                        <i class="bi bi-check-lg me-1"></i> Save Authenticator Configuration
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Authentication Methods Policy Overview -->
+<div class="card section-card">
+    <div class="card-header d-flex align-items-center">
+        <i class="bi bi-shield-lock me-2"></i> Authentication Methods Policy Overview
+    </div>
+    <div class="card-body p-0">
+        @if (Model.Policy == null)
+        {
+            <p class="text-muted p-3">Unable to load policy overview.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Method</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var method in Model.Policy.AuthenticationMethodConfigurations)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@method.Id</td>
+                                <td>
+                                    <span class="status-badge @(method.State == "enabled" ? "status-enabled" : "status-disabled")">
+                                        @method.State
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Policy.AuthenticationMethodConfigurations.Count == 0)
+                        {
+                            <tr><td colspan="2" class="text-center text-muted py-3">No authentication methods configured.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function showToast(message, isSuccess) {
+            var toast = document.getElementById('saveToast');
+            var toastBody = document.getElementById('toastMessage');
+            toast.classList.remove('text-bg-success', 'text-bg-danger');
+            toast.classList.add(isSuccess ? 'text-bg-success' : 'text-bg-danger');
+            toastBody.textContent = message;
+            var bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        function setLoading(btn, loading) {
+            if (loading) {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            } else {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        // ─── Add AAGUID row ──────────────────────────────────────
+        document.getElementById('addAaguid')?.addEventListener('click', function() {
+            var row = document.createElement('div');
+            row.className = 'input-group input-group-sm mb-1 aaguid-row';
+            row.innerHTML = '<input type="text" class="form-control aaguid-input" placeholder="e.g., 2fc0579f-8113-47ea-b116-bb5a8db9202a" />' +
+                '<button class="btn btn-outline-danger btn-sm" type="button" onclick="this.closest(\'.aaguid-row\').remove();"><i class="bi bi-x"></i></button>';
+            document.getElementById('aaguidList').appendChild(row);
+        });
+
+        // ─── Save FIDO2 ──────────────────────────────────────────
+        async function saveFido2Config() {
+            var btn = document.getElementById('saveFido2');
+            setLoading(btn, true);
+
+            var aaGuids = [];
+            document.querySelectorAll('.aaguid-input').forEach(function(input) {
+                if (input.value.trim()) aaGuids.push(input.value.trim());
+            });
+
+            var config = {
+                state: document.getElementById('fido2Enabled').checked ? 'enabled' : 'disabled',
+                isSelfServiceRegistrationAllowed: document.getElementById('fido2SelfService').checked,
+                isAttestationEnforced: document.getElementById('fido2Attestation').checked,
+                keyRestrictions: {
+                    isEnforced: document.getElementById('fido2KeyRestrictionsEnforced').checked,
+                    enforcementType: document.getElementById('fido2EnforcementType').value,
+                    aaGuids: aaGuids
+                }
+            };
+
+            try {
+                var response = await fetch('/api/passwordless/fido2', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                var result = await response.json();
+                if (response.ok) {
+                    showToast('FIDO2 configuration saved successfully!', true);
+                } else {
+                    showToast('Failed to save: ' + (result.error || 'Unknown error'), false);
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, false);
+            } finally {
+                setLoading(btn, false);
+            }
+        }
+
+        // ─── Save Authenticator ──────────────────────────────────
+        async function saveAuthenticatorConfig() {
+            var btn = document.getElementById('saveAuthenticator');
+            setLoading(btn, true);
+
+            var config = {
+                state: document.getElementById('authEnabled').checked ? 'enabled' : 'disabled',
+                featureSettings: {
+                    displayAppInformationRequiredState: {
+                        state: document.getElementById('authDisplayAppInfo').checked ? 'enabled' : 'default'
+                    },
+                    displayLocationInformationRequiredState: {
+                        state: document.getElementById('authDisplayLocation').checked ? 'enabled' : 'default'
+                    },
+                    companionAppAllowedState: {
+                        state: document.getElementById('authCompanionApp').checked ? 'enabled' : 'default'
+                    }
+                }
+            };
+
+            try {
+                var response = await fetch('/api/passwordless/authenticator', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                var result = await response.json();
+                if (response.ok) {
+                    showToast('Authenticator configuration saved successfully!', true);
+                } else {
+                    showToast('Failed to save: ' + (result.error || 'Unknown error'), false);
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, false);
+            } finally {
+                setLoading(btn, false);
+            }
+        }
+    </script>
+}

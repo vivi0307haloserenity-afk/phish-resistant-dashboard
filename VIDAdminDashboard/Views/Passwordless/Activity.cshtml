@@ -1,0 +1,545 @@
+@model VIDAdminDashboard.Models.PasswordlessActivityViewModel
+@{
+    ViewData["Title"] = "Passwordless Activity Dashboard";
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>@Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- ═══ Force Refresh ════════════════════════════════════════════ -->
+<div class="d-flex justify-content-end mb-3">
+    <form asp-action="ForceRefresh" method="post">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-clockwise me-1"></i> Refresh Data
+        </button>
+    </form>
+</div>
+
+<!-- ═══ Phishing-Resistant Journey Progress ═════════════════════════ -->
+<div class="card section-card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <!-- Maturity badge -->
+            <div class="col-auto">
+                <div class="text-center px-3">
+                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center"
+                         style="width: 80px; height: 80px; border: 4px solid @Model.Kpis.MaturityColor; background: transparent;">
+                        <span class="fw-bold" style="font-size: 1rem; color: @Model.Kpis.MaturityColor;">@Model.Kpis.PhishingResistantPct%</span>
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge" style="background: @Model.Kpis.MaturityColor;">@Model.Kpis.MaturityRating</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Progress bars -->
+            <div class="col">
+                <h6 class="fw-semibold mb-1"><i class="bi bi-shield-check me-1"></i> Journey to Phishing-Resistant Authentication</h6>
+                <small class="text-muted">All percentages measured against <strong>@Model.Kpis.TenantEnabledUsers.ToString("N0")</strong> enabled users (of @Model.Kpis.TenantTotalUsers.ToString("N0") total)</small>
+
+                <!-- Phishing-resistant bar (the priority) -->
+                <div class="mt-3 mb-1 d-flex justify-content-between">
+                    <span><i class="bi bi-shield-fill-check me-1 text-primary"></i> Phishing Resistant (FIDO2 + Passkeys)</span>
+                    <span class="fw-semibold">@Model.Kpis.PhishingResistantUsers.ToString("N0") <small class="text-muted">(@Model.Kpis.PhishingResistantPct%)</small></span>
+                </div>
+                <div class="progress mb-3" style="height: 16px;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width: @Model.Kpis.PhishingResistantPct%; background: #0078d4;"
+                         aria-valuenow="@Model.Kpis.PhishingResistantPct" aria-valuemin="0" aria-valuemax="100">
+                        @if (Model.Kpis.PhishingResistantPct >= 5) { @($"{Model.Kpis.PhishingResistantPct}%") }
+                    </div>
+                </div>
+
+                <!-- Passwordless bar -->
+                <div class="mb-1 d-flex justify-content-between">
+                    <span><i class="bi bi-key me-1" style="color: #107c10;"></i> Passwordless Capable (any method)</span>
+                    <span class="fw-semibold">@Model.Kpis.PasswordlessCapableUsers.ToString("N0") <small class="text-muted">(@Model.Kpis.PasswordlessAdoptionPct%)</small></span>
+                </div>
+                <div class="progress mb-3" style="height: 12px;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width: @Model.Kpis.PasswordlessAdoptionPct%; background: #107c10;"
+                         aria-valuenow="@Model.Kpis.PasswordlessAdoptionPct" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+
+                <!-- MFA bar -->
+                <div class="mb-1 d-flex justify-content-between">
+                    <span><i class="bi bi-phone me-1" style="color: #8764b8;"></i> MFA Capable</span>
+                    <span class="fw-semibold">@Model.Kpis.MfaRegisteredUsers.ToString("N0") <small class="text-muted">(@Model.Kpis.MfaRegisteredPct%)</small></span>
+                </div>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width: @Model.Kpis.MfaRegisteredPct%; background: #8764b8;"
+                         aria-valuenow="@Model.Kpis.MfaRegisteredPct" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ KPI Cards ════════════════════════════════════════════════════ -->
+
+<!-- ═══ Global Administrator Security Status ════════════════════════ -->
+<div class="card section-card mb-4" style="border-left: 4px solid @Model.GlobalAdmins.OverallColor;">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <span>
+            <i class="bi bi-shield-lock me-2"></i>
+            <strong>Global Administrator Security Status</strong>
+            <span class="badge ms-2" style="background: @Model.GlobalAdmins.OverallColor;">@Model.GlobalAdmins.OverallRating</span>
+        </span>
+        <small class="text-muted">@Model.GlobalAdmins.TotalCount Global Admins (@Model.GlobalAdmins.EnabledCount enabled)</small>
+    </div>
+    <div class="card-body">
+        @if (Model.GlobalAdmins.TotalCount == 0)
+        {
+            <div class="text-center text-muted py-3">
+                <i class="bi bi-info-circle me-1"></i> Unable to retrieve Global Administrator data. Ensure Directory.Read.All and UserAuthenticationMethod.Read.All permissions are granted.
+            </div>
+        }
+        else
+        {
+            <!-- Summary mini-KPIs -->
+            <div class="row g-3 mb-3">
+                <div class="col">
+                    <div class="text-center p-2 rounded" style="background: rgba(0,120,212,0.1);">
+                        <div class="fs-4 fw-bold" style="color: #0078d4;">@Model.GlobalAdmins.PhishingResistantCount / @Model.GlobalAdmins.EnabledCount</div>
+                        <small class="text-muted">Phishing Resistant (@Model.GlobalAdmins.PhishingResistantPct%)</small>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="text-center p-2 rounded" style="background: rgba(16,124,16,0.1);">
+                        <div class="fs-4 fw-bold" style="color: #107c10;">@Model.GlobalAdmins.PasswordlessCount / @Model.GlobalAdmins.EnabledCount</div>
+                        <small class="text-muted">Passwordless (@Model.GlobalAdmins.PasswordlessPct%)</small>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="text-center p-2 rounded" style="background: rgba(255,185,0,0.1);">
+                        <div class="fs-4 fw-bold" style="color: #ffb900;">@Model.GlobalAdmins.MfaOnlyCount</div>
+                        <small class="text-muted">MFA Only (@Model.GlobalAdmins.MfaOnlyPct%)</small>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="text-center p-2 rounded" style="background: rgba(209,52,56,0.1);">
+                        <div class="fs-4 fw-bold" style="color: #d13438;">@Model.GlobalAdmins.PasswordOnlyCount</div>
+                        <small class="text-muted">Password Only (@Model.GlobalAdmins.PasswordOnlyPct%)</small>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.GlobalAdmins.PasswordOnlyCount > 0)
+            {
+                <div class="alert alert-danger py-2 mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>@Model.GlobalAdmins.PasswordOnlyCount Global Admin(s)</strong> have no MFA registered — these accounts are at critical risk.
+                </div>
+            }
+            @if (Model.GlobalAdmins.MfaOnlyCount > 0)
+            {
+                <div class="alert alert-warning py-2 mb-3">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    <strong>@Model.GlobalAdmins.MfaOnlyCount Global Admin(s)</strong> use MFA but lack phishing-resistant credentials. Consider enrolling FIDO2 keys.
+                </div>
+            }
+
+            <!-- Per-admin table -->
+            <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Display Name</th>
+                            <th>UPN</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Auth Strength</th>
+                            <th>Registered Methods</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var admin in Model.GlobalAdmins.Admins)
+                        {
+                            <tr class="@(admin.IsPasswordOnly ? "table-danger" : admin.HasMfa && !admin.HasPasswordless ? "table-warning" : "")">
+                                <td class="fw-semibold">@admin.DisplayName</td>
+                                <td><small>@admin.UserPrincipalName</small></td>
+                                <td class="text-center">
+                                    @if (admin.AccountEnabled)
+                                    {
+                                        <span class="badge bg-success" style="font-size: 0.65rem;">Enabled</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary" style="font-size: 0.65rem;">Disabled</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge @admin.AuthStrengthBadge" style="font-size: 0.7rem;">@admin.AuthStrength</span>
+                                </td>
+                                <td>
+                                    @foreach (var method in admin.RegisteredMethods.Where(m => m != "password"))
+                                    {
+                                        <span class="badge bg-light text-dark me-1" style="font-size: 0.65rem;">@GetMethodIcon(method) @GetMethodShortName(method)</span>
+                                    }
+                                    @if (!admin.RegisteredMethods.Any(m => m != "password"))
+                                    {
+                                        <span class="text-danger"><small><i class="bi bi-x-circle me-1"></i>Password only</small></span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@{
+    string GetMethodIcon(string method) => method switch
+    {
+        "fido2" => "🔑",
+        "windowsHelloForBusiness" => "👋",
+        "microsoftAuthenticator" => "📱",
+        "microsoftAuthenticatorPasswordless" => "📲",
+        "softwareOath" => "🔢",
+        "phone" => "📞",
+        "email" => "✉️",
+        "temporaryAccessPass" => "⏱️",
+        "platformCredential" => "🔐",
+        "passKeyDeviceBound" => "🔑",
+        _ => "🔒"
+    };
+    string GetMethodShortName(string method) => method switch
+    {
+        "fido2" => "FIDO2",
+        "windowsHelloForBusiness" => "WHfB",
+        "microsoftAuthenticator" => "Authenticator",
+        "microsoftAuthenticatorPasswordless" => "Auth (Passwordless)",
+        "softwareOath" => "TOTP",
+        "phone" => "Phone/SMS",
+        "email" => "Email",
+        "temporaryAccessPass" => "TAP",
+        "platformCredential" => "Platform Credential",
+        "passKeyDeviceBound" => "Passkey",
+        _ => method
+    };
+}
+
+<!-- ═══ Tenant Security Status ═══════════════════════════════════════ -->
+<div class="card section-card mb-4" style="border-left: 4px solid @Model.Kpis.MaturityColor;">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <span>
+            <i class="bi bi-building me-2"></i>
+            <strong>Tenant Security Status</strong>
+            <span class="badge ms-2" style="background: @Model.Kpis.MaturityColor;">@Model.Kpis.MaturityRating</span>
+        </span>
+        <small class="text-muted">@Model.Kpis.TenantEnabledUsers.ToString("N0") enabled users of @Model.Kpis.TenantTotalUsers.ToString("N0") total</small>
+    </div>
+    <div class="card-body">
+        @{
+            // Compute mutually exclusive percentages from tier distribution
+            var totalEnabled = Model.Kpis.TenantEnabledUsers;
+            var prCount = Model.TierDistribution.TotalPhishingResistant;
+            var pwlCount = Model.TierDistribution.PasswordlessNonPR;
+            var mfaCount = Model.TierDistribution.MfaOnly;
+            var pwdCount = Model.TierDistribution.PasswordOnly;
+            var prPct = totalEnabled > 0 ? Math.Round((double)prCount / totalEnabled * 100, 1) : 0;
+            var pwlPct = totalEnabled > 0 ? Math.Round((double)pwlCount / totalEnabled * 100, 1) : 0;
+            var mfaPct = totalEnabled > 0 ? Math.Round((double)mfaCount / totalEnabled * 100, 1) : 0;
+            var pwdPct = totalEnabled > 0 ? Math.Round((double)pwdCount / totalEnabled * 100, 1) : 0;
+        }
+        <!-- Summary mini-KPIs (mutually exclusive tiers — each user counted once at highest level) -->
+        <div class="row g-3 mb-3">
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(0,120,212,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #0078d4;">@prPct%</div>
+                    <small class="text-muted">Phishing Resistant</small>
+                    <div class="text-muted" style="font-size: 0.75rem;"><span class="fw-semibold">@prCount.ToString("N0")</span> users (exclusive)</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(16,124,16,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #107c10;">@pwlPct%</div>
+                    <small class="text-muted">Passwordless (non-PR)</small>
+                    <div class="text-muted" style="font-size: 0.75rem;"><span class="fw-semibold">@pwlCount.ToString("N0")</span> users</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(255,185,0,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #ffb900;">@mfaPct%</div>
+                    <small class="text-muted">MFA Only</small>
+                    <div class="text-muted" style="font-size: 0.75rem;"><span class="fw-semibold">@mfaCount.ToString("N0")</span> users</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(209,52,56,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #d13438;">@pwdPct%</div>
+                    <small class="text-muted">Password Only</small>
+                    <div class="text-muted" style="font-size: 0.75rem;"><span class="fw-semibold">@pwdCount.ToString("N0")</span> users</div>
+                </div>
+            </div>
+        </div>
+        <div class="text-muted text-center" style="font-size: 0.75rem;">
+            <i class="bi bi-info-circle me-1"></i> Each user is counted once at their highest authentication tier. Tiers sum to @totalEnabled.ToString("N0") enabled users.
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Phishing-Resistant Enforcement ═══════════════════════════════ -->
+<div class="card section-card mb-4" style="border-left: 4px solid @Model.Enforcement.VerdictColor;">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <span>
+            <i class="bi @Model.Enforcement.VerdictIcon me-2"></i>
+            <strong>Phishing-Resistant Enforcement</strong>
+            <span class="badge ms-2" style="background: @Model.Enforcement.VerdictColor;">@Model.Enforcement.OverallVerdict</span>
+        </span>
+        <small class="text-muted">Conditional Access policies requiring PR auth strength</small>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(16,124,16,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #107c10;">@Model.Enforcement.EnforcingPolicies</div>
+                    <small class="text-muted">Enforcing Policies</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(255,185,0,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #ffb900;">@Model.Enforcement.ReportOnlyPolicies</div>
+                    <small class="text-muted">Report-Only</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(0,120,212,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #0078d4;">@Model.Enforcement.UserCoverage</div>
+                    <small class="text-muted">User Coverage</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="text-center p-2 rounded" style="background: rgba(0,120,212,0.1);">
+                    <div class="fs-4 fw-bold" style="color: #0078d4;">@Model.Enforcement.AppCoverage</div>
+                    <small class="text-muted">App Coverage</small>
+                </div>
+            </div>
+            @if (Model.Enforcement.HasExclusions)
+            {
+                <div class="col">
+                    <div class="text-center p-2 rounded" style="background: rgba(209,52,56,0.1);">
+                        <div class="fs-4 fw-bold" style="color: #d13438;">@(Model.Enforcement.ExcludedGroupCount + Model.Enforcement.ExcludedAppCount)</div>
+                        <small class="text-muted">Exclusions</small>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Charts Row ═══════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <!-- Security Tier Distribution (Doughnut) -->
+    <div class="col-lg-5">
+        <div class="card section-card h-100">
+            <div class="card-header d-flex align-items-center">
+                <i class="bi bi-pie-chart me-2"></i> Security Tier Distribution
+            </div>
+            <div class="card-body">
+                <div style="position: relative; height: 300px;">
+                    <canvas id="tierChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Last 24h Sign-ins by Auth Method (horizontal bar) -->
+    <div class="col-lg-7">
+        <div class="card section-card h-100">
+            <div class="card-header d-flex align-items-center">
+                <i class="bi bi-bar-chart me-2"></i> Last 24h Sign-ins by Auth Method
+                <small class="ms-auto text-muted">Based on most recent 200 sign-ins</small>
+            </div>
+            <div class="card-body">
+                <div style="position: relative; height: 300px;">
+                    <canvas id="signInMethodChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Registration Method Table ══════════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <!-- Registration method breakdown table -->
+    <div class="col-12">
+        <div class="card section-card h-100">
+            <div class="card-header d-flex align-items-center">
+                <i class="bi bi-table me-2"></i> Registration Breakdown by Method
+                <small class="ms-auto text-muted">% of Enabled = users / @Model.Kpis.TenantEnabledUsers.ToString("N0") enabled accounts</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 340px; overflow-y: auto;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Auth Method</th>
+                                <th class="text-center">Classification</th>
+                                <th class="text-end">Users</th>
+                                <th class="text-end">% of Enabled</th>
+                                <th style="width: 30%;">Coverage of Enabled Users</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.RegistrationsByMethod.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-4">No registration data available.</td></tr>
+                            }
+                            @foreach (var method in Model.RegistrationsByMethod.Where(m => m.UserCount > 0))
+                            {
+                                var badgeClass = method.IsPhishingResistant ? "bg-primary"
+                                    : method.IsPasswordless ? "bg-success"
+                                    : "bg-secondary";
+                                var badgeLabel = method.IsPhishingResistant ? "Phishing Resistant"
+                                    : method.IsPasswordless ? "Passwordless"
+                                    : "Legacy / Other";
+                                var barColor = method.IsPhishingResistant ? "#0078d4"
+                                    : method.IsPasswordless ? "#107c10"
+                                    : "#605e5c";
+
+                                <tr>
+                                    <td>@method.DisplayName</td>
+                                    <td class="text-center">
+                                        <span class="badge @badgeClass" style="font-size: 0.7rem;">@badgeLabel</span>
+                                    </td>
+                                    <td class="text-end fw-semibold">@method.UserCount.ToString("N0")</td>
+                                    <td class="text-end fw-semibold">@method.PercentOfEnabledUsers%</td>
+                                    <td>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar" role="progressbar"
+                                                 style="width: @method.PercentOfEnabledUsers%; background: @barColor;"
+                                                 aria-valuenow="@method.PercentOfEnabledUsers" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Data Freshness Note ══════════════════════════════════════════ -->
+<div class="text-muted text-center mb-4">
+    <small>
+        <i class="bi bi-info-circle me-1"></i>
+        Registration data is pre-aggregated by Microsoft Graph and may be up to 24 hours old.
+        Sign-in data reflects the most recent 200 sign-ins within the last 24 hours.
+        Data is cached server-side (registrations: 30 min, sign-ins: 15 min, tenant count: 60 min).
+    </small>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        // ─── Security Tier Distribution (Doughnut) ───────────────────
+        var tierData = {
+            fido2HwKey: @Model.TierDistribution.Fido2HardwareKey,
+            authPasskey: @Model.TierDistribution.AuthenticatorPasskey,
+            syncedPasskey: @Model.TierDistribution.SyncedPasskey,
+            deviceBoundPasskey: @Model.TierDistribution.DeviceBoundPasskey,
+            passwordlessNonPR: @Model.TierDistribution.PasswordlessNonPR,
+            mfaOnly: @Model.TierDistribution.MfaOnly,
+            passwordOnly: @Model.TierDistribution.PasswordOnly
+        };
+
+        var tierLabels = ['FIDO2 Hardware Key', 'Authenticator Passkey', 'Synced Passkey', 'Device-bound Passkey', 'Passwordless (non-PR)', 'MFA Only', 'Password Only'];
+        var tierValues = [tierData.fido2HwKey, tierData.authPasskey, tierData.syncedPasskey, tierData.deviceBoundPasskey, tierData.passwordlessNonPR, tierData.mfaOnly, tierData.passwordOnly];
+        var tierColors = ['#0078d4', '#005a9e', '#00bcf2', '#2b88d8', '#107c10', '#ffb900', '#d13438'];
+
+        // Filter out zero-value tiers
+        var filteredTier = tierLabels.reduce(function(acc, label, i) {
+            if (tierValues[i] > 0) {
+                acc.labels.push(label);
+                acc.values.push(tierValues[i]);
+                acc.colors.push(tierColors[i]);
+            }
+            return acc;
+        }, { labels: [], values: [], colors: [] });
+
+        new Chart(document.getElementById('tierChart'), {
+            type: 'doughnut',
+            data: {
+                labels: filteredTier.labels,
+                datasets: [{
+                    data: filteredTier.values,
+                    backgroundColor: filteredTier.colors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 14, padding: 10, font: { size: 12 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                var pct = total > 0 ? Math.round(ctx.raw / total * 1000) / 10 : 0;
+                                return ctx.label + ': ' + ctx.raw.toLocaleString() + ' (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // ─── Last 24h Sign-ins by Auth Method (horizontal bar) ───────
+        var signInData = @Html.Raw(Json.Serialize(Model.RecentSignIns));
+
+        var siLabels = signInData.map(function(d) { return d.displayName; });
+        var siSuccess = signInData.map(function(d) { return d.successCount; });
+        var siFailure = signInData.map(function(d) { return d.failureCount; });
+
+        new Chart(document.getElementById('signInMethodChart'), {
+            type: 'bar',
+            data: {
+                labels: siLabels,
+                datasets: [
+                    {
+                        label: 'Successful',
+                        data: siSuccess,
+                        backgroundColor: 'rgba(16,124,16,0.7)',
+                        borderRadius: 4,
+                        stack: 'stack0'
+                    },
+                    {
+                        label: 'Failed',
+                        data: siFailure,
+                        backgroundColor: 'rgba(209,52,56,0.7)',
+                        borderRadius: 4,
+                        stack: 'stack0'
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true, stacked: true, ticks: { precision: 0 } },
+                    y: { stacked: true, ticks: { font: { size: 11 } } }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12 } }
+                }
+            }
+        });
+
+
+    </script>
+}
